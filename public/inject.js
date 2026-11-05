@@ -26,7 +26,6 @@
   let currentDetailSymbol = null;
   let prevDetailPrice = null;
 
-  // 封装 fetch 带超时
   async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 8000 } = options;
     const controller = new AbortController();
@@ -71,7 +70,7 @@
   }
 
   // ==========================================
-  // 内页图表核心重写
+  // 内页图表核心
   // ==========================================
   window.openCoinDetail = function(coinId, symbol) {
     const sheet = document.getElementById('bottom-sheet');
@@ -81,12 +80,10 @@
     currentDetailSymbol = symbol;
     prevDetailPrice = null;
     
-    // 1. 安全初始化静态 DOM
     document.getElementById('sheet-coin-logo').src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coinId}.png`;
     document.getElementById('sheet-coin-name').textContent = symbol;
     document.getElementById('sheet-coin-symbol').textContent = symbol;
     
-    // 2. 延迟一点点销毁旧图表并清空容器，防止尺寸计算错误
     setTimeout(() => {
       if (chartInstance) {
         chartInstance.remove();
@@ -96,10 +93,8 @@
       document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">图表数据加载中...</div>';
     }, 10);
 
-    // 3. 拉取数据
     fetchDetailData(coinId, symbol);
 
-    // 4. 启动定时刷新
     if (detailTimer) clearInterval(detailTimer);
     detailTimer = setInterval(() => { fetchDetailData(coinId, symbol); }, refreshInterval);
   };
@@ -110,21 +105,18 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const detail = await res.json();
 
-      // 从列表数据兜底基础信息
       const coinInfo = currentPageData.find(c => String(c.id) === String(coinId)) || {};
 
-      // 1. 价格与闪烁
       const priceEl = document.getElementById('sheet-coin-price');
       const newPrice = detail.price;
       if (prevDetailPrice !== null && newPrice !== prevDetailPrice) {
         priceEl.classList.remove('price-flash-up', 'price-flash-down');
-        void priceEl.offsetWidth; // 触发重绘
+        void priceEl.offsetWidth;
         priceEl.classList.add(newPrice > prevDetailPrice ? 'price-flash-up' : 'price-flash-down');
       }
       priceEl.textContent = formatPrice(newPrice);
       prevDetailPrice = newPrice;
 
-      // 2. 各百分比数据
       const p24 = detail.pct24h || coinInfo.percentChange24h || 0;
       const changeEl = document.getElementById('sheet-coin-change');
       changeEl.className = p24 >= 0 ? 'text-up' : 'text-down';
@@ -135,22 +127,18 @@
       const p7 = detail.pct7d || coinInfo.percentChange7d || 0;
       document.getElementById('sheet-coin-7d').innerHTML = `<span class="${p7 >= 0 ? 'text-up' : 'text-down'}">${p7 >= 0 ? '▲' : '▼'} ${formatPercent(p7)}</span>`;
       
-      // 3. 市值、成交量、供应量兜底
       document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
       document.getElementById('sheet-coin-vol').textContent = formatCompact(detail.vol24h || coinInfo.volume24h);
       document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol || symbol}`;
 
-      // 4. 渲染图表
       if (detail.klines && detail.klines.length > 0) {
         drawChart(detail.klines);
       } else {
-        // 如果后端 K 线为空，显示假数据
         document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无K线数据 (该交易对可能在交易所不存在)</div>`;
       }
 
     } catch (e) {
       console.warn('[Detail] 接口获取失败，使用列表数据兜底', e);
-      // 接口彻底挂掉时，用列表数据兜底
       const coinInfo = currentPageData.find(c => String(c.id) === String(coinId));
       if (coinInfo) {
         document.getElementById('sheet-coin-price').textContent = formatPrice(coinInfo.price);
@@ -163,16 +151,12 @@
     }
   }
 
-  // 专用画图函数（带重试尺寸监控）
   function drawChart(klines) {
     const container = document.getElementById('detail-chart');
     if (!container) return;
-    
-    // 强制检查容器的宽和高
     const width = container.clientWidth || container.parentElement.clientWidth || 600;
     const height = 300;
 
-    // 如果正在加载的状态，清空文本
     if (container.querySelector('div')) container.innerHTML = '';
 
     if (!chartInstance) {
@@ -192,7 +176,6 @@
       candleSeries.setData(klines);
       chartInstance.timeScale().fitContent();
     } else {
-      // 增量更新
       candleSeries.update(klines[klines.length - 1]);
     }
   }
@@ -398,7 +381,6 @@
   async function init() {
     setupFloatingMenus();
     await initLanguage(); 
-    // 轮播图初始化
     try {
       const res = await fetchWithTimeout(`${API_BASE}/news`);
       newsData = await res.json();
