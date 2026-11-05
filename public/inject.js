@@ -44,7 +44,7 @@
   }
 
   // ==========================================
-  // 2. 渲染顶部卡片
+  // 2. 渲染顶部数据
   // ==========================================
   async function renderTopCards() {
     try {
@@ -58,29 +58,34 @@
       const trending = trendingRes.ok ? await trendingRes.json() : {};
       const derivatives = derivativesRes.ok ? await derivativesRes.json() : {};
 
-      // 卡片 1
+      // 恐慌贪婪指数
       const fg = global.fearGreed || {};
-      const fgValueEl = document.getElementById('fg-value');
-      if (fgValueEl) fgValueEl.textContent = fg.value ?? '--';
-      const fgLabelEl = document.getElementById('fg-label');
-      if (fgLabelEl) fgLabelEl.textContent = fg.classification ?? 'Neutral';
+      if (document.getElementById('fg-value-d')) document.getElementById('fg-value-d').textContent = fg.value ?? '--';
+      if (document.getElementById('fg-label-d')) document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
+      if (document.getElementById('fg-value-m')) document.getElementById('fg-value-m').textContent = fg.value ?? '--';
+      if (document.getElementById('fg-label-m')) document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
       
+      // 总市值
       const mcapStr = formatCompact(global.totalMarketCap);
       const mcapChange = global.marketCapChange24h || 0;
       const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
       const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
-      const globalMcapEl = document.getElementById('global-mcap');
-      if (globalMcapEl) globalMcapEl.innerHTML = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
+      const mcapHtml = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
+      
+      if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
+      if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
 
-      // 卡片 2
+      // 桌面端 Trending 轮播
       trendingData = trending.data || [];
-      if (trendingData.length > 0) {
+      if (trendingData.length > 0 && document.getElementById('trending-list')) {
         renderTrendingPage(0);
         startTrendingRotation();
       }
 
-      // 卡片 3
-      renderDerivativesCard(derivatives);
+      // 桌面端 Derivatives
+      if (document.getElementById('derivatives-content')) {
+        renderDerivativesCard(derivatives);
+      }
 
     } catch (e) {
       console.warn('[topCards] 顶部数据加载失败:', e);
@@ -88,7 +93,7 @@
   }
 
   // ==========================================
-  // 3. Trending 轮播
+  // 3. Trending & Derivatives (仅桌面端有 DOM 时渲染)
   // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
@@ -134,9 +139,6 @@
     }, 4000);
   }
 
-  // ==========================================
-  // 4. Derivatives 渲染
-  // ==========================================
   function renderDerivativesCard(derivatives) {
     const totalLiq = derivatives.totalLiquidations || 0;
     const longLiq = derivatives.longLiquidations || 0;
@@ -164,23 +166,17 @@
           </div>
       </div>
     `;
-    const container = document.getElementById('derivatives-content');
-    if (container) container.innerHTML = derHtml;
+    document.getElementById('derivatives-content').innerHTML = derHtml;
   }
 
   // ==========================================
-  // 5. 底部抽屉 (Bottom Sheet) 交互
+  // 4. 底部抽屉交互
   // ==========================================
-  // 暴露到全局，供 HTML 内联 onclick 调用
   window.openCoinDetail = function(coinId) {
-    // 从当前页面表格或全局数据中寻找该币种。为了简单，这里直接找 `allCoins` 或临时缓存
-    // 但因为我们每次翻页会覆盖表格数据，最好能在渲染时把数据存入一个 Map。
     const coin = currentPageData.find(c => String(c.id) === String(coinId));
     if (!coin) return;
 
     const sheet = document.getElementById('bottom-sheet');
-    
-    // 填充数据
     document.getElementById('sheet-coin-logo').src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`;
     document.getElementById('sheet-coin-name').textContent = coin.name;
     document.getElementById('sheet-coin-symbol').textContent = coin.symbol;
@@ -200,31 +196,20 @@
     document.getElementById('sheet-coin-vol').textContent = formatCompact(coin.volume24h);
     document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coin.circulatingSupply)} ${coin.symbol}`;
     
-    const chartImg = document.getElementById('sheet-coin-chart');
-    chartImg.src = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
-    chartImg.style.display = 'block';
-
-    // 显示抽屉
+    document.getElementById('sheet-coin-chart').src = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
     sheet.classList.add('show');
   };
 
-  // 关闭抽屉
   function setupBottomSheet() {
     const sheet = document.getElementById('bottom-sheet');
-    const closeBtn = document.getElementById('sheet-close');
-    
-    const close = () => sheet.classList.remove('show');
-    
-    closeBtn.addEventListener('click', close);
-    sheet.addEventListener('click', (e) => {
-      if (e.target === sheet) close(); // 点击遮罩关闭
-    });
+    document.getElementById('sheet-close').addEventListener('click', () => sheet.classList.remove('show'));
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.classList.remove('show'); });
   }
 
   // ==========================================
-  // 6. 表格渲染
+  // 5. 表格渲染
   // ==========================================
-  let currentPageData = []; // 存储当前页数据供弹窗使用
+  let currentPageData = [];
 
   function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
@@ -233,7 +218,7 @@
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
 
-    currentPageData = coins; // 保存当前数据
+    currentPageData = coins;
 
     if (!coins || coins.length === 0) {
       tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px;">当前页没有数据或接口请求失败。</td></tr>';
@@ -261,7 +246,6 @@
       const a24 = p24 >= 0 ? '▲' : '▼';
       const a7 = p7 >= 0 ? '▲' : '▼';
 
-      // 注意这里的 onclick 改为调用我们的底部抽屉
       html += `
         <tr onclick="window.openCoinDetail(${id})">
           <td>${rank}</td>
@@ -306,10 +290,10 @@
   }
 
   // ==========================================
-  // 7. 初始化
+  // 6. 初始化
   // ==========================================
   async function init() {
-    setupBottomSheet(); // 初始化抽屉事件
+    setupBottomSheet();
     renderTopCards();
     loadPageData(currentPage);
 
