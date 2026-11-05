@@ -5,7 +5,6 @@
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
-  // 轮播图全局变量
   let newsData = [];
   let currentSlide = 0;
   let carouselTimer = null;
@@ -32,7 +31,7 @@
       const key = el.getAttribute('data-i18n');
       if (dict[key]) el.textContent = dict[key];
     });
-    loadPageData(currentPage); // 刷新表格文本
+    loadPageData(currentPage);
   }
 
   async function initLanguage() {
@@ -75,7 +74,7 @@
   }
 
   // ==========================================
-  // 2. 动态新闻轮播图
+  // 2. 动态新闻轮播图 (已取消跳转)
   // ==========================================
   async function initCarousel() {
     const inner = document.getElementById('carousel-inner');
@@ -87,11 +86,11 @@
       if (!res.ok) throw new Error('News API failed');
       newsData = await res.json();
     } catch (e) {
-      console.warn('News load failed, using fallback.');
+      console.warn('News load failed, using local fallback.');
       newsData = [
-        { title: 'Crypto Daily News', description: 'Stay tuned for latest updates', url: '#' },
-        { title: 'Market Analysis', description: 'Check out the latest trends', url: '#' },
-        { title: 'Blockchain Innovation', description: 'Explore the future of Web3', url: '#' }
+        { title: 'Bitcoin Market Update', description: 'Stay updated with the latest Bitcoin price movements.', url: '#' },
+        { title: 'Ethereum Ecosystem', description: 'Explore new developments in the ETH network.', url: '#' },
+        { title: 'Crypto Trends 2024', description: 'Discover what is shaping the crypto market this year.', url: '#' }
       ];
     }
 
@@ -103,17 +102,17 @@
 
     let slideHtml = '';
     newsData.forEach((news, idx) => {
+      // 注意这里：取消了 onclick 和 cursor: pointer
       slideHtml += `
-        <div class="carousel-item" style="background: ${gradients[idx % gradients.length]}; cursor: pointer;" onclick="window.open('${news.url}', '_blank')">
+        <div class="carousel-item" style="background: ${gradients[idx % gradients.length]};">
           <h2>${news.title}</h2>
           <p>${news.description}</p>
         </div>
       `;
     });
     inner.innerHTML = slideHtml;
-    // 动态设置 inner 的宽度 (例如 3张图就是 300%)
+    
     inner.style.width = `${newsData.length * 100}%`;
-    // 动态设置每个 item 的宽度
     inner.querySelectorAll('.carousel-item').forEach(item => {
       item.style.width = `${100 / newsData.length}%`;
     });
@@ -433,7 +432,7 @@
   // ==========================================
   async function init() {
     setupLangSwitcher();
-    await initLanguage(); // 确保语言初始化完成后再拉取新闻，虽然新闻接口与语言无关，但避免异步竞争
+    await initLanguage(); 
     
     initCarousel();
     setupBottomSheet();
