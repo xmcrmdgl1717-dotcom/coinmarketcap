@@ -7,13 +7,17 @@ const cmc = require('../providers/cmc');
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const key = 'global';
+  const key = 'global-metrics';
   const cached = cache.get(key);
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
     const result = await dedupe(key, async () => {
-      const r = await cmc.fetchGlobal();
+      const [globalData, fearGreed] = await Promise.all([
+        cmc.fetchGlobal(),
+        cmc.fetchFearGreed(),
+      ]);
+      const r = { ...globalData, fearGreed };
       cache.set(key, r, config.cache.global);
       return r;
     });
