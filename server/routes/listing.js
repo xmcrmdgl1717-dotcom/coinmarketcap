@@ -3,80 +3,150 @@ const cache = require('../utils/cache');
 const cmc = require('../providers/cmc');
 const router = express.Router();
 
-// 核心：从 OKX (欧易) 获取精准的实时数据
-// 使用 OKX 是因为国内服务器连接极其稳定，不会像币安那样被墙
-async function getRealTimeCryptoData() {
+// ---------- 数据源1: OKX ----------
+async function getOKXData() {
   try {
-    // OKX 的 tickers 接口返回全量币种，国内直连非常快
     const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
     if (!res.ok) throw new Error(`OKX HTTP ${res.status}`);
-    
     const data = await res.json();
     const map = {};
-    
     if (data && data.data) {
       data.data.forEach(item => {
-        // OKX 交易对格式如 "BTC-USDT"
-        if (item.instId.endsWith('-USDT')) {
+        if (item.instId && item.instId.endsWith('-USDT')) {
           const symbol = item.instId.replace('-USDT', '');
           const price = parseFloat(item.last);
           const open24h = parseFloat(item.open24h);
-          
           if (!isNaN(price) && !isNaN(open24h) && open24h > 0) {
-            // 计算 24h 涨跌幅
-            const percentChange24h = ((price - open24h) / open24h) * 100;
-            map[symbol] = { price, percentChange24h };
+            map[symbol] = {
+              price,
+              percentChange24h: ((price - open24h) / open24h) * 100
+            };
           }
         }
       });
     }
+    console.log(`[OKX] 获取到 ${Object.keys(map).length} 个交易对`);
     return map;
   } catch (e) {
-    console.error('[Crypto Market] 获取实时数据失败:', e.message);
-    return {}; // 失败降级为 CMC 数据
+    console.error('[OKX] 获取失败:', e.message);
+    return {};
   }
 }
 
-// ==========================================
-// 行情列表路由
-// ==========================================
+// ---------- 数据源2: Binance ----------
+async function getBinanceData() {
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+    if (!res.ok) throw new Error(`Binance HTTP ${res.status}`);
+    const data = await res.json();
+    const map = {};
+    data.forEach(item => {
+      if (item.symbol && item.symbol.endsWith('USDT')) {
+        const symbol = item.symbol.replace('USDT', '');
+        const price = parseFloat(item.lastPrice);
+        const changePercent = parseFloat(item.priceChangePercent);
+        if (!isNaN(price)) {
+          map[symbol] = {
+            price,
+            percentChange24h: isNaN(changePercent) ? 0 : changePercent
+          };
+        }
+      }
+    });
+    console.log(`[Binance] 获取到 ${Object.keys(map).length} 个交易对`);
+    return map;
+  } catch (e) {
+    console.error('[Binance] 获取失败:', e.message);
+    return {};
+  }
+}
+
+// ---------- 数据源3: CoinGecko (全量补充) ----------
+async function getCoinGeckoData() {
+  try {
+    // 使用免费端点，获取前250个币的USD价格
+    const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false');
+    if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+    const data = await res.json();
+    const map = {};
+    data.forEach(item => {
+      if (item.symbol) {
+        map[item.symbol.toUpperCase()] = {
+          price: item.current_price,
+          percentChange24h: item.price_change_percentage_24h ?? 0
+        };
+      }
+    });
+    console.log(`[CoinGecko] 获取到 ${Object.keys(map).length} 个币种`);
+    return map;
+  } catch (e) {
+    console.error('[CoinGecko] 获取失败:', e.message);
+    return {};
+  }
+}
+
+// ---------- 主路由 ----------
 router.get('/', async (req, res) => {
   const start = Math.max(1, parseInt(req.query.start, 10) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 100));
   const key = `listing:${start}:${limit}`;
   
-  // 缓存时间降至 3 秒，让高频刷新更极致
   const cached = cache.get(key);
   if (cached) return res.json(cached);
 
   try {
-    // 并行请求：CMC 拿排名/市值，OKX 拿实时价格
-    const [cmcResult, realTimeData] = await Promise.all([
+    // 并行请求：CMC基础数据 + 三大实时数据源
+    const [cmcResult, okxData, binanceData, geckoData] = await Promise.all([
       cmc.fetchListing({ start, limit }),
-      getRealTimeCryptoData()
+      getOKXData(),
+      getBinanceData(),
+      getCoinGeckoData()
     ]);
 
-    const now = Date.now(); // 后端当前时间戳
+    const now = Date.now();
 
-    // 合并数据
+    // 核心合并逻辑：按优先级 OKX > Binance > CoinGecko > CMC
     const finalData = cmcResult.data.map(coin => {
-      // 特殊处理：稳定币
-      if (coin.symbol === 'USDT' || coin.symbol === 'USDC' || coin.symbol === 'DAI') {
+      const symbol = coin.symbol.toUpperCase();
+
+      // 稳定币特殊处理
+      if (['USDT', 'USDC', 'DAI', 'TUSD', 'BUSD'].includes(symbol)) {
         coin.price = 1.00;
         coin.percentChange24h = 0.00;
         coin.updateTime = now;
         return coin;
       }
 
-      // 如果 OKX 有数据，直接覆盖
-      if (realTimeData[coin.symbol]) {
-        coin.price = realTimeData[coin.symbol].price;
-        coin.percentChange24h = realTimeData[coin.symbol].percentChange24h;
+      // 1. 优先尝试 OKX
+      if (okxData[symbol]) {
+        coin.price = okxData[symbol].price;
+        coin.percentChange24h = okxData[symbol].percentChange24h;
+        coin.updateTime = now;
+        coin.source = 'OKX';
+        return coin;
       }
-      
-      // 注入一个更新时间戳，前端用来证明刷新了
+
+      // 2. 其次尝试 Binance
+      if (binanceData[symbol]) {
+        coin.price = binanceData[symbol].price;
+        coin.percentChange24h = binanceData[symbol].percentChange24h;
+        coin.updateTime = now;
+        coin.source = 'Binance';
+        return coin;
+      }
+
+      // 3. 再次尝试 CoinGecko
+      if (geckoData[symbol]) {
+        coin.price = geckoData[symbol].price;
+        coin.percentChange24h = geckoData[symbol].percentChange24h;
+        coin.updateTime = now;
+        coin.source = 'CoinGecko';
+        return coin;
+      }
+
+      // 4. 最终兜底：保留 CMC 原数据
       coin.updateTime = now;
-      
+      coin.source = 'CMC';
       return coin;
     });
 
@@ -85,12 +155,12 @@ router.get('/', async (req, res) => {
       totalCount: cmcResult.totalCount
     };
 
-    // 缓存 3 秒
+    // 缓存3秒
     cache.set(key, result, 3 * 1000);
     return res.json(result);
 
   } catch (err) {
-    console.error('[listing] 所有数据源失败:', err.message);
+    console.error('[listing] 数据源全部失败:', err.message);
     return res.status(200).json({ data: [] });
   }
 });
