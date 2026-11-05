@@ -2,11 +2,21 @@ const express = require('express');
 const cache = require('../utils/cache');
 const router = express.Router();
 
-// 获取 OKX 的单币种详情
+// 清洗 K 线数据，确保升序、数字类型
+function cleanKlines(klines) {
+  if (!Array.isArray(klines)) return [];
+  return klines.map(k => ({
+    time: parseInt(k.time),
+    open: parseFloat(k.open),
+    high: parseFloat(k.high),
+    low: parseFloat(k.low),
+    close: parseFloat(k.close)
+  })).filter(k => !isNaN(k.time) && !isNaN(k.close)).sort((a, b) => a.time - b.time);
+}
+
 async function fetchOKXDetail(symbol) {
   try {
     const instId = `${symbol.toUpperCase()}-USDT`;
-    // 并行请求 24h ticker 和 7天K线
     const [tickerRes, klineRes] = await Promise.all([
       fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`),
       fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1D&limit=7`)
@@ -25,17 +35,19 @@ async function fetchOKXDetail(symbol) {
     const vol24h = parseFloat(t.volCcy24h);
     const pct24h = ((price - open24h) / open24h) * 100;
 
-    // 将 OKX K线数据转为标准格式
-    const klines = klineData.data.map(k => ({
-      time: parseInt(k[0]) / 1000, // 秒级时间戳
-      open: parseFloat(k[1]),
-      high: parseFloat(k[2]),
-      low: parseFloat(k[3]),
-      close: parseFloat(k[4])
-    })).reverse(); // OKX返回是倒序，需要翻转
+    // OKX 返回的 K 线是 [时间, 开, 高, 低, 收, 量...]，时间倒序
+    const rawKlines = klineData.data.map(k => ({
+      time: parseInt(k[0]) / 1000,
+      open: k[1],
+      high: k[2],
+      low: k[3],
+      close: k[4]
+    }));
+    
+    // 清洗并升序
+    const klines = cleanKlines(rawKlines);
 
-    // 1小时和7天涨跌幅简单估算 (OKX 没有直接提供，用首尾K线算)
-    const pct1h = 0; // 简化处理，可另拉1h K线计算
+    const pct1h = 0; 
     const pct7d = klines.length > 1 ? ((price - klines[0].open) / klines[0].open) * 100 : 0;
 
     return { price, pct1h, pct24h, pct7d, vol24h, klines, source: 'OKX' };
@@ -44,7 +56,6 @@ async function fetchOKXDetail(symbol) {
   }
 }
 
-// 获取 Binance 的单币种详情 (兜底)
 async function fetchBinanceDetail(symbol) {
   try {
     const bSymbol = `${symbol.toUpperCase()}USDT`;
@@ -62,13 +73,15 @@ async function fetchBinanceDetail(symbol) {
     const pct24h = parseFloat(t.priceChangePercent);
     const vol24h = parseFloat(t.quoteVolume);
 
-    const klines = klineData.map(k => ({
+    const rawKlines = klineData.map(k => ({
       time: parseInt(k[0]) / 1000,
-      open: parseFloat(k[1]),
-      high: parseFloat(k[2]),
-      low: parseFloat(k[3]),
-      close: parseFloat(k[4])
+      open: k[1],
+      high: k[2],
+      low: k[3],
+      close: k[4]
     }));
+
+    const klines = cleanKlines(rawKlines);
 
     const pct1h = 0; 
     const pct7d = klines.length > 1 ? ((price - klines[0].open) / klines[0].open) * 100 : 0;
@@ -92,7 +105,7 @@ router.get('/', async (req, res) => {
     if (!result) result = await fetchBinanceDetail(symbol);
 
     if (result) {
-      cache.set(key, result, 10 * 1000); // 详情缓存10秒
+      cache.set(key, result, 10 * 1000);
       return res.json(result);
     }
     
