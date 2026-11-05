@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
     const trendingList = await cmc.fetchTrending();
     res.json({ data: trendingList });
   } catch (err) {
-    res.status(502).json({ error: 'trending unavailable' });
+    res.status(200).json({ data: [] });
   }
 });
 module.exports = router;
