@@ -10,16 +10,13 @@ if (process.env.NODE_ENV !== 'production' && fs.existsSync(envPath)) {
 module.exports = {
   port: Number(process.env.PORT) || 3001,
   cmc: {
-    baseUrl: 'https://pro-api.coinmarketcap.com',
+    // 如果没有 API Key，必须走 /public-api。如果有 Key，请改成 'https://pro-api.coinmarketcap.com'
+    baseUrl: process.env.CMC_API_KEY ? 'https://pro-api.coinmarketcap.com' : 'https://pro-api.coinmarketcap.com/public-api',
     apiKey: process.env.CMC_API_KEY || '',
-    listingPath: process.env.CMC_LISTING_PATH || '/public-api/v1/cryptocurrency/listings/latest',
-    globalPath: process.env.CMC_GLOBAL_PATH || '/public-api/v1/global-metrics/quotes/latest',
-    fearGreedPath: process.env.CMC_FEAR_GREED_PATH || '/public-api/v1/fear-and-greed/latest',
     timeout: 10000,
   },
   cache: {
-    listing: 30 * 1000,
-    global: 60 * 1000,
-    fearGreed: 120 * 1000,
-  },
+    listing: 30 * 1000, // 30秒
+    global: 60 * 1000,  // 1分钟
+  }
 };
