@@ -1,9 +1,5 @@
 const config = require('../config');
 
-// 注意：如果使用 Keyless，这里的 baseUrl 应包含 /public-api
-// 例如: https://pro-api.coinmarketcap.com/public-api
-const API_BASE = config.cmc.baseUrl;
-
 async function fetchWithTimeout(url, headers) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.cmc.timeout);
@@ -22,16 +18,17 @@ function authHeaders() {
 
 // 1. 行情列表
 async function fetchListing({ start, limit }) {
-  const url = new URL(API_BASE + '/v3/cryptocurrency/listings/latest');
+  const url = new URL(config.cmc.baseUrl + '/v1/cryptocurrency/listings/latest');
   url.searchParams.set('start', String(start));
   url.searchParams.set('limit', String(limit));
   url.searchParams.set('convert', 'USD');
+
   const res = await fetchWithTimeout(url, authHeaders());
   if (!res.ok) throw new Error(`CMC listing ${res.status}`);
   const json = await res.json();
   return {
     data: (json.data || []).map(item => ({
-      id: item.id, rank: item.cmc_rank, name: item.name, symbol: item.symbol, slug: item.slug,
+      id: item.id, rank: item.cmc_rank, name: item.name, symbol: item.symbol,
       price: item.quote?.USD?.price ?? 0,
       percentChange1h: item.quote?.USD?.percent_change_1h ?? 0,
       percentChange24h: item.quote?.USD?.percent_change_24h ?? 0,
@@ -44,9 +41,9 @@ async function fetchListing({ start, limit }) {
   };
 }
 
-// 2. 全球指标 (Market Cap, Dominance)
+// 2. 全球指标
 async function fetchGlobal() {
-  const url = new URL(API_BASE + '/v1/global-metrics/quotes/latest');
+  const url = new URL(config.cmc.baseUrl + '/v1/global-metrics/quotes/latest');
   url.searchParams.set('convert', 'USD');
   const res = await fetchWithTimeout(url, authHeaders());
   if (!res.ok) throw new Error(`CMC global ${res.status}`);
@@ -54,16 +51,13 @@ async function fetchGlobal() {
   const usd = json.data?.quote?.USD || {};
   return {
     totalMarketCap: usd.total_market_cap ?? 0,
-    totalVolume24h: usd.total_volume_24h ?? 0,
     marketCapChange24h: usd.total_market_cap_yesterday_percentage_change ?? 0,
-    btcDominance: json.data?.btc_dominance ?? 0,
-    ethDominance: json.data?.eth_dominance ?? 0,
   };
 }
 
 // 3. 恐慌贪婪指数
 async function fetchFearGreed() {
-  const url = new URL(API_BASE + '/v3/fear-and-greed/latest');
+  const url = new URL(config.cmc.baseUrl + '/v3/fear-and-greed/latest');
   const res = await fetchWithTimeout(url, authHeaders());
   if (!res.ok) throw new Error(`CMC fear-greed ${res.status}`);
   const json = await res.json();
@@ -73,9 +67,9 @@ async function fetchFearGreed() {
   };
 }
 
-// 4. 衍生品爆仓数据
+// 4. 衍生品与爆仓
 async function fetchDerivatives() {
-  const url = new URL(API_BASE + '/v5/derivatives/liquidations/quotes/latest');
+  const url = new URL(config.cmc.baseUrl + '/v5/derivatives/liquidations/quotes/latest');
   url.searchParams.set('convert', 'USD');
   const res = await fetchWithTimeout(url, authHeaders());
   if (!res.ok) throw new Error(`CMC derivatives ${res.status}`);
@@ -90,7 +84,7 @@ async function fetchDerivatives() {
   };
 }
 
-// 5. 趋势币种 (直接取行情列表前 5 名)
+// 5. 趋势币种 (直接复用列表的前 5 个)
 async function fetchTrending() {
   const result = await fetchListing({ start: 1, limit: 5 });
   return result.data;
