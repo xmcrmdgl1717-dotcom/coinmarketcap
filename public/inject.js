@@ -68,7 +68,7 @@
   }
 
   // ==========================================
-  // 核心修复：内页图表生命周期与防闪烁
+  // 内页图表核心
   // ==========================================
   window.openCoinDetail = function(coinId, symbol) {
     const sheet = document.getElementById('bottom-sheet');
@@ -82,16 +82,15 @@
     document.getElementById('sheet-coin-name').textContent = symbol;
     document.getElementById('sheet-coin-symbol').textContent = symbol;
     
-    // 1. 清理旧图表实例
+    // ★ 核心修复：打开新弹窗时，彻底销毁旧实例，只清空一次 DOM
     if (chartInstance) {
         chartInstance.remove();
         chartInstance = null;
         candleSeries = null;
     }
-    // 2. 显示 Loading
     document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">图表加载中...</div>';
 
-    // 3. 延迟 350ms 等抽屉滑出后再拉数据画图（解决宽度为0的问题）
+    // 延迟等待弹窗动画结束再渲染
     setTimeout(() => {
         fetchDetailData(coinId, symbol);
     }, 350);
@@ -127,18 +126,17 @@
       document.getElementById('sheet-coin-vol').textContent = formatCompact(detail.vol24h || coinInfo.volume24h);
       document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol || symbol}`;
 
-      // 核心修复：如果没有 K 线数据，直接 return，千万不要去动图表 DOM
+      // 没有 K 线数据直接返回，绝不碰 DOM
       if (!detail.klines || detail.klines.length === 0) return;
 
-      // 画图
       const container = document.getElementById('detail-chart');
-      // 如果容器里有 loading 字样，先清空（只清一次）
-      if (container.querySelector('div')) {
+      
+      // ★ 核心修复：因为前面可能残留了“图表加载中”的 div，如果当前还没有实例，才去清理它
+      if (!chartInstance && container.querySelector('div')) {
           container.innerHTML = ''; 
       }
 
       if (!chartInstance) {
-        // 第一次创建
         chartInstance = LightweightCharts.createChart(container, {
           width: container.clientWidth || 600,
           height: 300,
@@ -153,13 +151,13 @@
         candleSeries.setData(detail.klines);
         chartInstance.timeScale().fitContent();
       } else {
-        // 后续刷新，只更新最新的一根 K 线，实现丝滑跳动
+        // ★ 核心修复：后续刷新，只 update 最新一条数据，绝不摧毁 DOM
         candleSeries.update(detail.klines[detail.klines.length - 1]);
       }
 
     } catch (e) {
-      console.warn('[Detail] 接口异常，保留现有图表', e);
-      // 捕获异常，但不做任何 DOM 删除操作
+      console.warn('[Detail] 接口异常', e);
+      // 发生异常什么也不做，保留原本的图表
     }
   }
 
@@ -281,7 +279,7 @@
     }
   }
 
-  // 其他卡片
+  // 其他卡片渲染
   async function renderTopCards() {
     try {
       const [globalRes, trendingRes, derivativesRes] = await Promise.all([
@@ -289,6 +287,7 @@
         fetchWithTimeout(`${API_BASE}/trending`).catch(() => null),
         fetchWithTimeout(`${API_BASE}/derivatives`).catch(() => null)
       ]);
+      
       const global = globalRes && globalRes.ok ? await globalRes.json() : {};
       let trending = { data: [] };
       if (trendingRes && trendingRes.ok) trending = await trendingRes.json();
