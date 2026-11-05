@@ -3,33 +3,37 @@ const cache = require('../utils/cache');
 const cmc = require('../providers/cmc');
 const router = express.Router();
 
-// ==========================================
-// 核心：从币安获取实时价格与涨跌幅
-// ==========================================
-async function getBinanceData() {
+// 核心：从 OKX (欧易) 获取精准的实时数据
+// 使用 OKX 是因为国内服务器连接极其稳定，不会像币安那样被墙
+async function getRealTimeCryptoData() {
   try {
-    // 使用 24hr 接口，同时获取最新价和 24h 涨跌幅
-    const res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
-    if (!res.ok) throw new Error(`Binance HTTP ${res.status}`);
+    // OKX 的 tickers 接口返回全量币种，国内直连非常快
+    const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+    if (!res.ok) throw new Error(`OKX HTTP ${res.status}`);
     
     const data = await res.json();
     const map = {};
     
-    // 遍历币安数据，提取 USDT 交易对
-    data.forEach(item => {
-      if (item.symbol.endsWith('USDT')) {
-        // 将 BTCUSDT 截取为 BTC
-        const symbol = item.symbol.replace('USDT', '');
-        map[symbol] = {
-          price: parseFloat(item.lastPrice),
-          percentChange24h: parseFloat(item.priceChangePercent)
-        };
-      }
-    });
+    if (data && data.data) {
+      data.data.forEach(item => {
+        // OKX 交易对格式如 "BTC-USDT"
+        if (item.instId.endsWith('-USDT')) {
+          const symbol = item.instId.replace('-USDT', '');
+          const price = parseFloat(item.last);
+          const open24h = parseFloat(item.open24h);
+          
+          if (!isNaN(price) && !isNaN(open24h) && open24h > 0) {
+            // 计算 24h 涨跌幅
+            const percentChange24h = ((price - open24h) / open24h) * 100;
+            map[symbol] = { price, percentChange24h };
+          }
+        }
+      });
+    }
     return map;
   } catch (e) {
-    console.error('[Binance] 获取实时数据失败:', e.message);
-    return {}; // 失败则返回空对象，后续会自动降级使用 CMC 数据
+    console.error('[Crypto Market] 获取实时数据失败:', e.message);
+    return {}; // 失败降级为 CMC 数据
   }
 }
 
@@ -41,31 +45,37 @@ router.get('/', async (req, res) => {
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 100));
   const key = `listing:${start}:${limit}`;
   
-  // 缓存时间设为 5 秒，配合前端的高频刷新
+  // 缓存时间降至 3 秒，让高频刷新更极致
   const cached = cache.get(key);
   if (cached) return res.json(cached);
 
   try {
-    // 并行请求：CMC 获取基础数据，Binance 获取实时价格
-    const [cmcResult, binanceData] = await Promise.all([
+    // 并行请求：CMC 拿排名/市值，OKX 拿实时价格
+    const [cmcResult, realTimeData] = await Promise.all([
       cmc.fetchListing({ start, limit }),
-      getBinanceData()
+      getRealTimeCryptoData()
     ]);
 
-    // 合并数据：用币安的实时数据覆盖 CMC 的缓存数据
+    const now = Date.now(); // 后端当前时间戳
+
+    // 合并数据
     const finalData = cmcResult.data.map(coin => {
-      // 特殊处理 USDT 稳定币
-      if (coin.symbol === 'USDT') {
+      // 特殊处理：稳定币
+      if (coin.symbol === 'USDT' || coin.symbol === 'USDC' || coin.symbol === 'DAI') {
         coin.price = 1.00;
         coin.percentChange24h = 0.00;
+        coin.updateTime = now;
         return coin;
       }
 
-      // 如果币安有这个币种的数据，进行覆盖
-      if (binanceData[coin.symbol]) {
-        coin.price = binanceData[coin.symbol].price;
-        coin.percentChange24h = binanceData[coin.symbol].percentChange24h;
+      // 如果 OKX 有数据，直接覆盖
+      if (realTimeData[coin.symbol]) {
+        coin.price = realTimeData[coin.symbol].price;
+        coin.percentChange24h = realTimeData[coin.symbol].percentChange24h;
       }
+      
+      // 注入一个更新时间戳，前端用来证明刷新了
+      coin.updateTime = now;
       
       return coin;
     });
@@ -75,8 +85,8 @@ router.get('/', async (req, res) => {
       totalCount: cmcResult.totalCount
     };
 
-    // 缓存 5 秒
-    cache.set(key, result, 5 * 1000);
+    // 缓存 3 秒
+    cache.set(key, result, 3 * 1000);
     return res.json(result);
 
   } catch (err) {
