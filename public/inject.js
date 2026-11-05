@@ -5,6 +5,10 @@
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
+  // --- 刷新控制 ---
+  let refreshInterval = 5000; // 默认 5 秒
+  let refreshTimer = null;
+
   let newsData = [];
   let currentSlide = 0;
   let carouselTimer = null;
@@ -31,7 +35,7 @@
       const key = el.getAttribute('data-i18n');
       if (dict[key]) el.textContent = dict[key];
     });
-    loadPageData(currentPage);
+    loadPageData(currentPage, true);
   }
 
   async function initLanguage() {
@@ -58,23 +62,70 @@
     else applyLanguage('en');
   }
 
-  function setupLangSwitcher() {
-    const btn = document.getElementById('lang-btn');
-    const dropdown = document.getElementById('lang-dropdown');
-    btn.addEventListener('click', (e) => { e.stopPropagation(); dropdown.classList.toggle('show'); });
-    document.addEventListener('click', () => dropdown.classList.remove('show'));
-    dropdown.querySelectorAll('div').forEach(el => {
+  // ==========================================
+  // 2. 悬浮菜单控制 (语言 & 刷新)
+  // ==========================================
+  function setupFloatingMenus() {
+    const langBtn = document.getElementById('lang-btn');
+    const langDropdown = document.getElementById('lang-dropdown');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const refreshDropdown = document.getElementById('refresh-dropdown');
+
+    // 关闭所有下拉菜单
+    const closeAll = () => {
+      langDropdown.classList.remove('show');
+      refreshDropdown.classList.remove('show');
+    };
+
+    // 语言切换
+    langBtn.addEventListener('click', (e) => { e.stopPropagation(); closeAll(); langDropdown.classList.toggle('show'); });
+    langDropdown.querySelectorAll('div').forEach(el => {
       el.addEventListener('click', () => {
         const lang = el.getAttribute('data-lang');
         localStorage.setItem('crypto_lang', lang);
         applyLanguage(lang);
-        dropdown.classList.remove('show');
+        closeAll();
       });
     });
+
+    // 刷新频率切换
+    refreshBtn.addEventListener('click', (e) => { e.stopPropagation(); closeAll(); refreshDropdown.classList.toggle('show'); });
+    refreshDropdown.querySelectorAll('div').forEach(el => {
+      el.addEventListener('click', () => {
+        const time = parseInt(el.getAttribute('data-time'));
+        
+        // 更新 UI 高亮
+        refreshDropdown.querySelectorAll('div').forEach(d => d.classList.remove('active'));
+        el.classList.add('active');
+
+        // 重新设置定时器
+        setupRefreshTimer(time);
+        closeAll();
+      });
+    });
+
+    // 点击页面其他区域关闭
+    document.addEventListener('click', closeAll);
   }
 
   // ==========================================
-  // 2. 动态新闻轮播图 (已取消跳转)
+  // 3. 自动刷新逻辑
+  // ==========================================
+  function setupRefreshTimer(interval = 5000) {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshInterval = interval;
+
+    if (interval > 0) {
+      refreshTimer = setInterval(() => {
+        // 静默刷新顶部卡片和表格
+        renderTopCards();
+        loadPageData(currentPage, true);
+      }, interval);
+    }
+  }
+
+  // ==========================================
+  // 4. 动态新闻轮播图
   // ==========================================
   async function initCarousel() {
     const inner = document.getElementById('carousel-inner');
@@ -102,7 +153,6 @@
 
     let slideHtml = '';
     newsData.forEach((news, idx) => {
-      // 注意这里：取消了 onclick 和 cursor: pointer
       slideHtml += `
         <div class="carousel-item" style="background: ${gradients[idx % gradients.length]};">
           <h2>${news.title}</h2>
@@ -111,7 +161,6 @@
       `;
     });
     inner.innerHTML = slideHtml;
-    
     inner.style.width = `${newsData.length * 100}%`;
     inner.querySelectorAll('.carousel-item').forEach(item => {
       item.style.width = `${100 / newsData.length}%`;
@@ -139,7 +188,6 @@
     const inner = document.getElementById('carousel-inner');
     const dots = document.querySelectorAll('.carousel-dot');
     if (!inner || !dots.length) return;
-
     currentSlide = index;
     inner.style.transform = `translateX(-${currentSlide * (100 / newsData.length)}%)`;
     dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
@@ -160,7 +208,7 @@
   }
 
   // ==========================================
-  // 3. 格式化工具
+  // 5. 格式化工具
   // ==========================================
   function formatPrice(p) {
     if (p == null || isNaN(p) || p === 0) return '--';
@@ -193,7 +241,7 @@
   }
 
   // ==========================================
-  // 4. 渲染顶部数据
+  // 6. 渲染顶部数据
   // ==========================================
   async function renderTopCards() {
     try {
@@ -255,7 +303,7 @@
   }
 
   // ==========================================
-  // 5. Trending & Derivatives
+  // 7. Trending & Derivatives
   // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
@@ -323,8 +371,10 @@
   }
 
   // ==========================================
-  // 6. 底部抽屉
+  // 8. 底部抽屉
   // ==========================================
+  let currentPageData = [];
+
   window.openCoinDetail = function(coinId) {
     const coin = currentPageData.find(c => String(c.id) === String(coinId));
     if (!coin) return;
@@ -355,9 +405,8 @@
   }
 
   // ==========================================
-  // 7. 表格渲染
+  // 9. 表格渲染 (支持静默刷新)
   // ==========================================
-  let currentPageData = [];
   function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
@@ -365,6 +414,7 @@
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
     const dict = i18nData[currentLang] || i18nData['en'];
+    
     currentPageData = coins;
 
     if (!coins || coins.length === 0) {
@@ -391,6 +441,8 @@
       const a1 = p1 >= 0 ? '▲' : '▼';
       const a24 = p24 >= 0 ? '▲' : '▼';
       const a7 = p7 >= 0 ? '▲' : '▼';
+      
+      // 在这里保留 DOM 节点，以便增量更新（或者简单粗暴直接 innerHTML 整个替换）
       html += `
         <tr onclick="window.openCoinDetail(${id})">
           <td>${rank}</td>
@@ -406,16 +458,25 @@
         </tr>
       `;
     });
+    
+    // 如果使用整体替换，会导致 hover 状态或者滚动状态被重置。但对于简单页面来说足够。
+    // 为了防止浏览器闪烁，最好是通过 documentFragment 替换
     tbody.innerHTML = html;
+    
     if (pageInfo) pageInfo.textContent = `Page ${currentPage}`;
     if (btnPrev) btnPrev.disabled = currentPage === 1;
     if (btnNext) btnNext.disabled = coins.length < PAGE_SIZE;
   }
 
-  async function loadPageData(page) {
+  async function loadPageData(page, isSilent = false) {
     const tbody = document.getElementById('crypto-tbody');
     const dict = i18nData[currentLang] || i18nData['en'];
-    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#616e85;">${dict.loading}</td></tr>`;
+    
+    // 如果不是静默刷新，才显示加载提示
+    if (tbody && !isSilent) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#616e85;">${dict.loading}</td></tr>`;
+    }
+
     try {
       const start = (page - 1) * PAGE_SIZE + 1;
       const res = await fetch(`${API_BASE}/listing?start=${start}&limit=${PAGE_SIZE}`);
@@ -423,21 +484,26 @@
       const json = await res.json();
       renderTable(json.data);
     } catch (e) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">Failed to load: ${e.message}</td></tr>`;
+      if (tbody && !isSilent) {
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">Failed to load: ${e.message}</td></tr>`;
+      }
     }
   }
 
   // ==========================================
-  // 8. 初始化
+  // 10. 初始化
   // ==========================================
   async function init() {
-    setupLangSwitcher();
+    setupFloatingMenus(); // 初始化悬浮菜单（包含语言和刷新）
     await initLanguage(); 
     
     initCarousel();
     setupBottomSheet();
     renderTopCards();
-    loadPageData(currentPage);
+    loadPageData(currentPage); // 首次加载
+
+    // 首次启动定时器（默认 5s）
+    setupRefreshTimer(5000);
 
     document.getElementById('btn-prev')?.addEventListener('click', () => {
       if (currentPage > 1) { currentPage--; loadPageData(currentPage); window.scrollTo({ top: 0, behavior: 'smooth' }); }
