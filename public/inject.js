@@ -1,17 +1,22 @@
 (function () {
   'use strict';
 
+  // 你的后端 API 地址
   const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
+  
+  // 表格分页配置
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
-  // 轮播相关变量
+  // Trending 轮播配置
   let trendingData = [];
   let trendingPage = 0;
   const TRENDING_PAGE_SIZE = 5;
   let trendingTimer = null;
 
-  // --- 格式化函数 ---
+  // ==========================================
+  // 1. 格式化工具函数
+  // ==========================================
   function formatPrice(p) {
     if (p == null || isNaN(p) || p === 0) return '--';
     if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -19,6 +24,7 @@
     if (p >= 0.0001) return '$' + p.toFixed(6);
     return '$' + p.toFixed(8);
   }
+
   function formatCompact(n) {
     if (n == null || isNaN(n) || n === 0) return '--';
     const a = Math.abs(n);
@@ -28,6 +34,7 @@
     if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K';
     return '$' + n.toFixed(2);
   }
+
   function formatSupply(n) {
     if (n == null || isNaN(n) || n === 0) return '--';
     const a = Math.abs(n);
@@ -37,12 +44,15 @@
     if (a >= 1e3) return (n / 1e3).toFixed(2) + 'K';
     return String(n);
   }
+
   function formatPercent(p) {
     if (p == null || isNaN(p)) return '--';
     return Math.abs(p).toFixed(2) + '%';
   }
 
-  // --- 渲染顶部卡片 ---
+  // ==========================================
+  // 2. 渲染顶部卡片数据
+  // ==========================================
   async function renderTopCards() {
     try {
       const [globalRes, trendingRes, derivativesRes] = await Promise.all([
@@ -55,35 +65,43 @@
       const trending = trendingRes.ok ? await trendingRes.json() : {};
       const derivatives = derivativesRes.ok ? await derivativesRes.json() : {};
 
-      // 1. Market Status 渲染
+      // ---- 卡片 1: Market Status ----
       const fg = global.fearGreed || {};
-      document.getElementById('fg-value').textContent = fg.value ?? '--';
-      document.getElementById('fg-label').textContent = fg.classification ?? 'Neutral';
+      const fgValueEl = document.getElementById('fg-value');
+      const fgLabelEl = document.getElementById('fg-label');
+      if (fgValueEl) fgValueEl.textContent = fg.value ?? '--';
+      if (fgLabelEl) fgLabelEl.textContent = fg.classification ?? 'Neutral';
       
       const mcapStr = formatCompact(global.totalMarketCap);
       const mcapChange = global.marketCapChange24h || 0;
       const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
       const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
-      document.getElementById('global-mcap').innerHTML = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
-
-      // 2. Trending Coins 数据处理（准备轮播）
-      trendingData = trending.data || [];
-      if (trendingData.length > 0) {
-        renderTrendingPage(0);
-        startTrendingRotation();
-      } else {
-        document.getElementById('trending-list').innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding:20px;">暂无数据</div>';
+      const globalMcapEl = document.getElementById('global-mcap');
+      if (globalMcapEl) {
+        globalMcapEl.innerHTML = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
       }
 
-      // 3. Derivatives 渲染
+      // ---- 卡片 2: Trending Coins (轮播准备) ----
+      trendingData = trending.data || [];
+      if (trendingData.length > 0) {
+        renderTrendingPage(0); // 初始化渲染第一页
+        startTrendingRotation(); // 启动轮播定时器
+      } else {
+        const listEl = document.getElementById('trending-list');
+        if (listEl) listEl.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding:20px;">暂无数据</div>';
+      }
+
+      // ---- 卡片 3: Derivatives ----
       renderDerivativesCard(derivatives);
 
     } catch (e) {
-      console.warn('[topCards] 数据加载失败:', e);
+      console.warn('[topCards] 顶部数据加载失败:', e);
     }
   }
 
-  // --- Trending Coins 轮播逻辑 ---
+  // ==========================================
+  // 3. Trending Coins 轮播逻辑
+  // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
     const pageIndicator = document.getElementById('trending-page-indicator');
@@ -112,6 +130,7 @@
     });
     listEl.innerHTML = html;
 
+    // 更新指示器 (如 1/5 >)
     if (pageIndicator) {
       const totalPages = Math.ceil(trendingData.length / TRENDING_PAGE_SIZE);
       pageIndicator.textContent = `${pageIndex + 1}/${totalPages} >`;
@@ -125,20 +144,22 @@
       if (totalPages <= 1) return;
       trendingPage = (trendingPage + 1) % totalPages;
       renderTrendingPage(trendingPage);
-    }, 4000); // 每 4 秒切换一次
+    }, 4000); // 每 4 秒切换一次页面
   }
 
-  // --- Derivatives 渲染 ---
+  // ==========================================
+  // 4. Derivatives 渲染逻辑
+  // ==========================================
   function renderDerivativesCard(derivatives) {
     const totalLiq = derivatives.totalLiquidations || 0;
     const longLiq = derivatives.longLiquidations || 0;
     const shortLiq = derivatives.shortLiquidations || 0;
     
-    // 生成随机高度和颜色的柱子模拟图表
+    // 随机生成微型柱状图
     let barsHtml = '';
     for (let i = 0; i < 12; i++) {
-      const isRed = Math.random() > 0.4;
-      const height = Math.floor(Math.random() * 60) + 30; 
+      const isRed = Math.random() > 0.4; // 稍微多一点红色
+      const height = Math.floor(Math.random() * 60) + 30; // 30% - 90% 高度
       const color = isRed ? '#ea3943' : '#16c784';
       barsHtml += `<div class="bar" style="height:${height}%; background:${color};"></div>`;
     }
@@ -161,10 +182,13 @@
           </div>
       </div>
     `;
-    document.getElementById('derivatives-content').innerHTML = derHtml;
+    const container = document.getElementById('derivatives-content');
+    if (container) container.innerHTML = derHtml;
   }
 
-  // --- 渲染底部表格 ---
+  // ==========================================
+  // 5. 表格渲染逻辑
+  // ==========================================
   function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
@@ -241,18 +265,33 @@
     }
   }
 
+  // ==========================================
+  // 6. 初始化与事件绑定
+  // ==========================================
   async function init() {
+    // 1. 渲染顶部
     renderTopCards();
+    
+    // 2. 渲染表格第一页
     loadPageData(currentPage);
 
+    // 3. 绑定翻页事件
     document.getElementById('btn-prev')?.addEventListener('click', () => {
-      if (currentPage > 1) { currentPage--; loadPageData(currentPage); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (currentPage > 1) { 
+        currentPage--; 
+        loadPageData(currentPage); 
+        window.scrollTo({ top: 0, behavior: 'smooth' }); 
+      }
     });
+    
     document.getElementById('btn-next')?.addEventListener('click', () => {
-      currentPage++; loadPageData(currentPage); window.scrollTo({ top: 0, behavior: 'smooth' });
+      currentPage++; 
+      loadPageData(currentPage); 
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
+  // 等 DOM 加载完成后启动
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
