@@ -7,9 +7,8 @@ function cleanKlines(klines) {
   if (!Array.isArray(klines) || klines.length === 0) return [];
   
   const cleaned = klines.map(k => {
-    // 兼容可能返回的字符串或数字时间戳
     let t = parseInt(k.time || k[0]);
-    if (t > 1e11) t = Math.floor(t / 1000); // 如果是毫秒，转为秒
+    if (t > 1e11) t = Math.floor(t / 1000); // 毫秒转秒
     
     return {
       time: t,
@@ -20,16 +19,13 @@ function cleanKlines(klines) {
     };
   }).filter(k => !isNaN(k.time) && !isNaN(k.close) && k.time > 0);
 
-  // 按时间升序排列，图表库严格要求顺序
   cleaned.sort((a, b) => a.time - b.time);
   return cleaned;
 }
 
-// 从 OKX 获取
 async function fetchOKX(symbol) {
   try {
     const instId = `${symbol.toUpperCase()}-USDT`;
-    // 拉取 ticker 和 7天K线
     const [tickerRes, klineRes] = await Promise.all([
       fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`),
       fetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=1D&limit=7`)
@@ -46,7 +42,6 @@ async function fetchOKX(symbol) {
     const open24h = parseFloat(tickerData.open24h);
     const pct24h = open24h ? ((price - open24h) / open24h) * 100 : 0;
     
-    // OKX 的 K 线数据是 [ts, o, h, l, c, vol, ...]
     const rawKlines = klineRaw.map(k => ({
       time: k[0], open: k[1], high: k[2], low: k[3], close: k[4]
     }));
@@ -55,20 +50,15 @@ async function fetchOKX(symbol) {
     const pct7d = klines.length > 0 ? ((price - klines[0].open) / klines[0].open) * 100 : 0;
 
     return { 
-      price, 
-      pct24h, 
-      pct7d, 
-      pct1h: 0, // OKX 这里没拉 1h 的数据，用 0 占位
+      price, pct24h, pct7d, pct1h: 0, 
       vol24h: parseFloat(tickerData.volCcy24h || 0), 
-      klines, 
-      source: 'OKX' 
+      klines, source: 'OKX' 
     };
   } catch (e) {
     return null;
   }
 }
 
-// 从 Binance 获取（备用）
 async function fetchBinance(symbol) {
   try {
     const bSymbol = `${symbol.toUpperCase()}USDT`;
@@ -91,13 +81,8 @@ async function fetchBinance(symbol) {
     const pct7d = klines.length > 0 ? ((price - klines[0].open) / klines[0].open) * 100 : 0;
 
     return { 
-      price, 
-      pct24h: parseFloat(t.priceChangePercent || 0), 
-      pct7d, 
-      pct1h: 0,
-      vol24h: parseFloat(t.quoteVolume || 0), 
-      klines, 
-      source: 'Binance' 
+      price, pct24h: parseFloat(t.priceChangePercent || 0), pct7d, pct1h: 0,
+      vol24h: parseFloat(t.quoteVolume || 0), klines, source: 'Binance' 
     };
   } catch (e) {
     return null;
