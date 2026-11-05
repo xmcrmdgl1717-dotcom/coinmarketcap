@@ -1,11 +1,9 @@
 (function () {
   'use strict';
 
-  // 请确认这里的地址与你部署的后端地址完全一致
   const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
   
-  let allCoins = [];
-  let currentPage = 3; 
+  let currentPage = 1; // 默认展示第 1 页，确保有数据
   const PAGE_SIZE = 100;
 
   // 格式化函数
@@ -40,7 +38,7 @@
   }
 
   // 渲染表格
-  function renderTable() {
+  function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
 
@@ -48,12 +46,13 @@
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
 
-    const totalPages = Math.ceil(allCoins.length / PAGE_SIZE) || 1;
-    const start = (currentPage - 1) * PAGE_SIZE;
-    const pageData = allCoins.slice(start, start + PAGE_SIZE);
+    if (!coins || coins.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 50px;">当前页没有数据。</td></tr>';
+      return;
+    }
 
     let html = '';
-    pageData.forEach(coin => {
+    coins.forEach(coin => {
       const rank = coin.rank || coin.cmcRank || '-';
       const name = coin.name || 'Unknown';
       const symbol = coin.symbol || '?';
@@ -97,28 +96,29 @@
     });
 
     tbody.innerHTML = html;
-    if(pageInfo) pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    if(pageInfo) pageInfo.textContent = `Page ${currentPage}`;
     if(btnPrev) btnPrev.disabled = currentPage === 1;
-    if(btnNext) btnNext.disabled = currentPage >= totalPages;
+    if(btnNext) btnNext.disabled = coins.length < PAGE_SIZE; // 如果不满100条，说明是最后一页
   }
 
-  // 初始化
-  async function init() {
+  // 加载指定页的数据
+  async function loadPageData(page) {
     const tbody = document.getElementById('crypto-tbody');
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 50px; color: #616e85;">正在连接服务器 (若页面长时间无响应，说明 Render 后端正在冷启动，通常需要等待 30-50 秒)...</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 50px; color: #616e85;">正在加载第 ${page} 页数据... (Render 冷启动需等待 30-50 秒)</td></tr>`;
     }
 
     try {
-      // 加入 60 秒超时设置（应对 Render 冷启动）
+      const start = (page - 1) * PAGE_SIZE + 1;
+      const url = `${API_BASE}/listing?start=${start}&limit=${PAGE_SIZE}`;
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-      const res = await fetch(`${API_BASE}/listing/all`, { signal: controller.signal });
+      const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-      
       const json = await res.json();
       
       let rawList = [];
@@ -126,24 +126,38 @@
       else if (json.data && Array.isArray(json.data)) rawList = json.data;
       else if (json.data && json.data.listing && json.data.listing.cryptoCurrencyList) rawList = json.data.listing.cryptoCurrencyList;
       
-      if (rawList.length > 0) {
-        allCoins = rawList.sort((a, b) => {
-          const rA = a.rank || a.cmcRank || 9999999;
-          const rB = b.rank || b.cmcRank || 9999999;
-          return rA - rB;
-        });
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const pageParam = parseInt(urlParams.get('page'), 10);
-        if (pageParam && pageParam > 0) currentPage = pageParam;
+      renderTable(rawList);
 
-        renderTable();
+    } catch (e) {
+      console.error('Data load failed:', e);
+      let errorMsg = e.message;
+      if (e.name === 'AbortError') errorMsg = "请求超时。Render 免费后端正在唤醒，请刷新重试。";
+      
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" style="text-align:center; padding: 50px; color: #ea3943;">
+              <strong>数据加载失败</strong><br><br>${errorMsg}
+            </td>
+          </tr>
+        `;
+      }
+    }
+  }
 
-        // 填充 Trending Coins 卡片
+  // 初始化
+  async function init() {
+    // 1. 渲染 Trending Coins 卡片 (写死拉取前 5 个)
+    try {
+      const resTop = await fetch(`${API_BASE}/listing?start=1&limit=5`);
+      const jsonTop = await resTop.json();
+      let topList = jsonTop.data || (jsonTop.data && jsonTop.data.listing && jsonTop.data.listing.cryptoCurrencyList) || [];
+      
+      if (topList.length > 0) {
         const trendingContainer = document.getElementById('trending-coins');
         if (trendingContainer) {
           let trendingHtml = '';
-          allCoins.slice(0, 5).forEach((coin, idx) => {
+          topList.slice(0, 5).forEach((coin, idx) => {
             const symbol = coin.symbol || '?';
             const id = coin.id || 0;
             const price = coin.price || coin.quotes?.USD?.price || 0;
@@ -167,37 +181,25 @@
           });
           trendingContainer.innerHTML = trendingHtml;
         }
-
-        // 绑定翻页
-        document.getElementById('btn-prev').addEventListener('click', () => {
-          if (currentPage > 1) { currentPage--; renderTable(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-        });
-        document.getElementById('btn-next').addEventListener('click', () => {
-          const total = Math.ceil(allCoins.length / PAGE_SIZE);
-          if (currentPage < total) { currentPage++; renderTable(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-        });
-
-      } else {
-        throw new Error("API 返回成功，但未找到数据。");
       }
-    } catch (e) {
-      console.error('Data load failed:', e);
-      if (tbody) {
-        // 如果是超时或网络错误，给出明确提示
-        let errorMsg = e.message;
-        if (e.name === 'AbortError') errorMsg = "请求超时（超过60秒）。Render 免费后端休眠后唤醒太慢，请刷新页面重试。";
-        
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="10" style="text-align:center; padding: 50px; color: #ea3943;">
-              <strong>数据加载失败</strong><br><br>
-              错误原因: ${errorMsg}<br>
-              请检查后端是否已成功部署，且配置了 CORS 跨域。
-            </td>
-          </tr>
-        `;
+    } catch(e) { console.log('Trending coins load failed', e); }
+
+    // 2. 加载第 1 页表格数据
+    loadPageData(currentPage);
+
+    // 3. 绑定翻页按钮事件
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      if (currentPage > 1) { 
+        currentPage--; 
+        loadPageData(currentPage); 
+        window.scrollTo({ top: 0, behavior: 'smooth' }); 
       }
-    }
+    });
+    document.getElementById('btn-next').addEventListener('click', () => {
+      currentPage++; 
+      loadPageData(currentPage); 
+      window.scrollTo({ top: 0, behavior: 'smooth' }); 
+    });
   }
 
   if (document.readyState === 'loading') {
