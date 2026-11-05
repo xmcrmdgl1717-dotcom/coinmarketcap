@@ -1,12 +1,11 @@
 (function () {
   'use strict';
 
-  const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
+  const API_BASE = '/api';
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
-  // --- 刷新控制 ---
-  let refreshInterval = 5000; // 默认 5 秒
+  let refreshInterval = 5000; 
   let refreshTimer = null;
 
   let newsData = [];
@@ -17,6 +16,9 @@
   let trendingPage = 0;
   const TRENDING_PAGE_SIZE = 5;
   let trendingTimer = null;
+
+  // 👇 核心：用来记录上一次的价格，用于比对闪烁
+  const prevPrices = {};
 
   // ==========================================
   // 1. 多语言字典
@@ -63,7 +65,7 @@
   }
 
   // ==========================================
-  // 2. 悬浮菜单控制 (语言 & 刷新)
+  // 2. 悬浮菜单控制
   // ==========================================
   function setupFloatingMenus() {
     const langBtn = document.getElementById('lang-btn');
@@ -71,13 +73,11 @@
     const refreshBtn = document.getElementById('refresh-btn');
     const refreshDropdown = document.getElementById('refresh-dropdown');
 
-    // 关闭所有下拉菜单
     const closeAll = () => {
       langDropdown.classList.remove('show');
       refreshDropdown.classList.remove('show');
     };
 
-    // 语言切换
     langBtn.addEventListener('click', (e) => { e.stopPropagation(); closeAll(); langDropdown.classList.toggle('show'); });
     langDropdown.querySelectorAll('div').forEach(el => {
       el.addEventListener('click', () => {
@@ -88,23 +88,17 @@
       });
     });
 
-    // 刷新频率切换
     refreshBtn.addEventListener('click', (e) => { e.stopPropagation(); closeAll(); refreshDropdown.classList.toggle('show'); });
     refreshDropdown.querySelectorAll('div').forEach(el => {
       el.addEventListener('click', () => {
         const time = parseInt(el.getAttribute('data-time'));
-        
-        // 更新 UI 高亮
         refreshDropdown.querySelectorAll('div').forEach(d => d.classList.remove('active'));
         el.classList.add('active');
-
-        // 重新设置定时器
         setupRefreshTimer(time);
         closeAll();
       });
     });
 
-    // 点击页面其他区域关闭
     document.addEventListener('click', closeAll);
   }
 
@@ -117,7 +111,6 @@
 
     if (interval > 0) {
       refreshTimer = setInterval(() => {
-        // 静默刷新顶部卡片和表格
         renderTopCards();
         loadPageData(currentPage, true);
       }, interval);
@@ -405,9 +398,9 @@
   }
 
   // ==========================================
-  // 9. 表格渲染 (支持静默刷新)
+  // 9. 表格渲染 (核心：价格比对 & 闪烁)
   // ==========================================
-  function renderTable(coins) {
+  function renderTable(coins, isSilent) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
     const pageInfo = document.getElementById('page-info');
@@ -441,13 +434,24 @@
       const a1 = p1 >= 0 ? '▲' : '▼';
       const a24 = p24 >= 0 ? '▲' : '▼';
       const a7 = p7 >= 0 ? '▲' : '▼';
+
+      // 👇 核心对比逻辑：只有当不是初次加载，且价格与上次不同时，才触发闪烁
+      let flashClass = '';
+      if (isSilent && prevPrices[id] !== undefined) {
+        if (price > prevPrices[id]) {
+          flashClass = 'price-flash-up';
+        } else if (price < prevPrices[id]) {
+          flashClass = 'price-flash-down';
+        }
+      }
+      // 记录最新价格
+      prevPrices[id] = price;
       
-      // 在这里保留 DOM 节点，以便增量更新（或者简单粗暴直接 innerHTML 整个替换）
       html += `
         <tr onclick="window.openCoinDetail(${id})">
           <td>${rank}</td>
           <td><div class="coin-info"><img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${id}.png" onerror="this.src='https://s2.coinmarketcap.com/static/cloud/img/coinmarketcap_1.svg'"/><span class="coin-name">${name}</span><span class="coin-symbol">${symbol}</span></div></td>
-          <td>${formatPrice(price)}</td>
+          <td class="${flashClass}">${formatPrice(price)}</td>
           <td class="${c1}">${a1} ${formatPercent(p1)}</td>
           <td class="${c24}">${a24} ${formatPercent(p24)}</td>
           <td class="${c7}">${a7} ${formatPercent(p7)}</td>
@@ -459,8 +463,6 @@
       `;
     });
     
-    // 如果使用整体替换，会导致 hover 状态或者滚动状态被重置。但对于简单页面来说足够。
-    // 为了防止浏览器闪烁，最好是通过 documentFragment 替换
     tbody.innerHTML = html;
     
     if (pageInfo) pageInfo.textContent = `Page ${currentPage}`;
@@ -472,7 +474,6 @@
     const tbody = document.getElementById('crypto-tbody');
     const dict = i18nData[currentLang] || i18nData['en'];
     
-    // 如果不是静默刷新，才显示加载提示
     if (tbody && !isSilent) {
       tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#616e85;">${dict.loading}</td></tr>`;
     }
@@ -482,7 +483,7 @@
       const res = await fetch(`${API_BASE}/listing?start=${start}&limit=${PAGE_SIZE}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      renderTable(json.data);
+      renderTable(json.data, isSilent); // 传入 isSilent 供对比逻辑使用
     } catch (e) {
       if (tbody && !isSilent) {
         tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">Failed to load: ${e.message}</td></tr>`;
@@ -494,22 +495,21 @@
   // 10. 初始化
   // ==========================================
   async function init() {
-    setupFloatingMenus(); // 初始化悬浮菜单（包含语言和刷新）
+    setupFloatingMenus();
     await initLanguage(); 
     
     initCarousel();
     setupBottomSheet();
     renderTopCards();
-    loadPageData(currentPage); // 首次加载
+    loadPageData(currentPage, false); // 首次加载，不要闪烁
 
-    // 首次启动定时器（默认 5s）
     setupRefreshTimer(5000);
 
     document.getElementById('btn-prev')?.addEventListener('click', () => {
-      if (currentPage > 1) { currentPage--; loadPageData(currentPage); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (currentPage > 1) { currentPage--; loadPageData(currentPage, false); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     });
     document.getElementById('btn-next')?.addEventListener('click', () => {
-      currentPage++; loadPageData(currentPage); window.scrollTo({ top: 0, behavior: 'smooth' });
+      currentPage++; loadPageData(currentPage, false); window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
 
