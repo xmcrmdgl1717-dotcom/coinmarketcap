@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cryptocurrency Prices by Market Cap</title>
-    <!-- 加上这行空图标，消除 404 报错 -->
     <link rel="icon" href="data:,">
     <style>
         :root {
@@ -15,7 +14,8 @@
             --up-color: #16c784;
             --down-color: #ea3943;
             --bg-card: #ffffff;
-            --shadow: 0 4px 12px rgba(0,0,0,0.05);
+            --bg-inner: #f8fafd;
+            --shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -23,74 +23,113 @@
         }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         
-        /* 顶部卡片自适应布局 */
-        .top-cards { 
-            display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 16px; 
-            margin-bottom: 24px; 
-        }
-        /* 平板尺寸变 2 列 */
-        @media (max-width: 1024px) {
-            .top-cards { grid-template-columns: repeat(2, 1fr); }
-        }
-        /* 手机尺寸变 1 列 */
-        @media (max-width: 600px) {
-            .top-cards { grid-template-columns: 1fr; }
-            .container { padding: 10px; }
-        }
+        /* ================= 顶部卡片布局 ================= */
+        .top-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+        @media (max-width: 1024px) { .top-cards { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .top-cards { grid-template-columns: 1fr; } }
 
         .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
-        .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; }
-        .card-title span { color: var(--text-secondary); font-weight: 400; font-size: 12px; }
-        .card-content { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
-        .stat-row { display: flex; justify-content: space-between; align-items: center; }
-        .stat-label { color: var(--text-secondary); white-space: nowrap; }
-        .stat-value { font-weight: 600; text-align: right; }
+        .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .card-title span { color: var(--text-secondary); font-weight: 400; font-size: 13px; cursor: pointer; }
+        
+        /* ================= 卡片1：Market Status ================= */
+        .ms-grid { display: flex; gap: 12px; margin-bottom: 12px; }
+        .ms-left { flex: 1; background: var(--bg-inner); border-radius: 8px; padding: 16px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .ms-right { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+        .ms-right .inner-card { background: var(--bg-inner); border-radius: 8px; padding: 12px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        
+        /* 仪表盘简易样式 */
+        .gauge { width: 80px; height: 40px; border-top-left-radius: 80px; border-top-right-radius: 80px; background: conic-gradient(from 270deg at 50% 100%, #ea3943 0%, #f3d42f 40%, #16c784 80%, transparent 80%); margin-bottom: 8px; position: relative; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 4px;}
+        .gauge::after { content: ''; position: absolute; width: 60px; height: 30px; background: var(--bg-inner); bottom: 0; left: 10px; border-top-left-radius: 60px; border-top-right-radius: 60px; }
+        .gauge-value { position: relative; z-index: 1; font-weight: 700; font-size: 16px; margin-bottom: 2px;}
+        .gauge-label { font-size: 11px; background: #f0b90b; color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600; z-index: 1; }
+
+        .stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 4px;}
+        .stat-label { color: var(--text-secondary); }
+        .stat-value { font-weight: 600; }
         .text-up { color: var(--up-color); }
         .text-down { color: var(--down-color); }
+
+        /* 进度条和 ETF 小图 */
+        .ms-bottom { display: flex; gap: 12px; }
+        .ms-bottom .inner-card { flex: 1; background: var(--bg-inner); border-radius: 8px; padding: 12px; }
+        .progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; display: flex; overflow: hidden; }
+        .progress-seg { height: 100%; }
+
+        /* ================= 卡片2 & 3：列表与图表 ================= */
+        .trend-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; }
+        .trend-left { display: flex; align-items: center; gap: 8px; }
+        .trend-left img { width: 20px; height: 20px; border-radius: 50%; }
         
+        .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 2px; overflow: hidden;}
+        .bar { flex: 1; border-radius: 2px 2px 0 0; }
+        
+        /* ================= 表格区域 ================= */
         .table-wrapper { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border-color); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: right; }
         th { color: var(--text-secondary); font-weight: 500; font-size: 12px; padding: 16px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; background: #fff; }
         th:nth-child(1), th:nth-child(2), td:nth-child(1), td:nth-child(2) { text-align: left; }
-        td { padding: 16px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
         tbody tr:hover { background-color: var(--bg-hover); }
         .coin-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .coin-info img { width: 24px; height: 24px; border-radius: 50%; }
         .coin-name { font-weight: 600; }
-        .coin-symbol { color: var(--text-secondary); font-size: 12px; }
+        .coin-symbol { color: var(--text-secondary); font-size: 12px; margin-left: 4px; }
         .sparkline { width: 100px; height: 30px; object-fit: contain; }
         
         .pagination { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 20px; padding-bottom: 40px; }
         button { padding: 8px 16px; border: 1px solid #cfd6e4; background: #fff; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-primary); }
         button:disabled { color: #ccc; cursor: not-allowed; border-color: var(--border-color); }
-        #page-info { color: var(--text-secondary); font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="top-cards">
+            <!-- Market Status -->
             <div class="card">
                 <div class="card-title">Market Status <span>查看全部 ></span></div>
-                <div class="card-content"></div>
+                <div class="ms-grid">
+                    <div class="ms-left">
+                        <div class="gauge"></div>
+                        <div class="gauge-value" id="fg-value">--</div>
+                        <div class="gauge-label" id="fg-label">Neutral</div>
+                    </div>
+                    <div class="ms-right">
+                        <div class="inner-card">
+                            <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value" id="global-mcap">--</span></div>
+                        </div>
+                        <div class="inner-card">
+                            <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="ms-bottom">
+                    <div class="inner-card">
+                        <div class="stat-row"><span class="stat-label">Altcoin Season</span><span class="stat-value">48</span></div>
+                        <div class="progress-bar">
+                            <div class="progress-seg" style="width:25%; background:#f0b90b;"></div>
+                            <div class="progress-seg" style="width:25%; background:#cfd6e4;"></div>
+                            <div class="progress-seg" style="width:25%; background:#3b82f6;"></div>
+                            <div class="progress-seg" style="width:25%; background:#16c784;"></div>
+                        </div>
+                    </div>
+                    <div class="inner-card">
+                        <div class="stat-row"><span class="stat-label">ETF Flows</span><span class="stat-value text-up">+ $148.10M</span></div>
+                    </div>
+                </div>
             </div>
+
+            <!-- Trending Coins -->
             <div class="card">
                 <div class="card-title">Trending Coins <span>1/5 ></span></div>
-                <div class="card-content"></div>
+                <div id="trending-list"></div>
             </div>
+
+            <!-- Derivatives -->
             <div class="card">
                 <div class="card-title">Derivatives <span>详情 ></span></div>
-                <div class="card-content"></div>
-            </div>
-            <div class="card">
-                <div class="card-title">Community <span>进入 ></span></div>
-                <div class="card-content">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <img src="https://s3.coinmarketcap.com/static-gravity/image/f4513c9b490e4dfb9c5ac561f63b95f4.png" style="width: 24px; height: 24px; border-radius: 50%;" />
-                        <div><strong>@TheCrypto_B</strong> <span style="color: var(--text-secondary); font-size: 12px;">· 7h · Bullish</span></div>
-                    </div>
-                    <div style="font-size: 13px; line-height: 1.4;">$BTC is back above $80,000 after a nervous election night in the US...</div>
+                <div id="derivatives-content">
+                    <!-- 占位 -->
                 </div>
             </div>
         </div>
@@ -118,7 +157,7 @@
         </div>
 
         <div class="pagination">
-            <span id="page-info">Page 1</span>
+            <span id="page-info" style="color: var(--text-secondary);">Page 1</span>
             <button id="btn-prev" disabled>Previous</button>
             <button id="btn-next">Next</button>
         </div>
