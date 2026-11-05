@@ -6,7 +6,9 @@
   const PAGE_LIMIT = 100;
   const REFRESH_INTERVAL = 30000;
 
-  // ---------- 格式化 ----------
+  // ==========================================
+  // 1. 格式化工具函数
+  // ==========================================
   function formatPrice(price) {
     if (price == null || isNaN(price)) return '--';
     if (price >= 1) return '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,6 +16,7 @@
     if (price >= 0.0001) return '$' + price.toFixed(6);
     return '$' + price.toFixed(8);
   }
+
   function formatCompact(num) {
     if (num == null || isNaN(num)) return '--';
     const abs = Math.abs(num);
@@ -23,6 +26,7 @@
     if (abs >= 1e3) return '$' + (num / 1e3).toFixed(2) + 'K';
     return '$' + num.toFixed(2);
   }
+
   function formatSupply(num) {
     if (num == null || isNaN(num)) return '--';
     const abs = Math.abs(num);
@@ -32,12 +36,15 @@
     if (abs >= 1e3) return (num / 1e3).toFixed(2) + 'K';
     return String(num);
   }
+
   function formatPercent(pct) {
     if (pct == null || isNaN(pct)) return '--';
     return Math.abs(pct).toFixed(2) + '%';
   }
 
-  // ---------- 解析 __NEXT_DATA__ ----------
+  // ==========================================
+  // 2. 解析源码中的 __NEXT_DATA__
+  // ==========================================
   function parseInitialData() {
     const el = document.getElementById('__NEXT_DATA__');
     if (!el) return null;
@@ -73,7 +80,9 @@
     }
   }
 
-  // ---------- DOM 绑定 ----------
+  // ==========================================
+  // 3. DOM 绑定与更新逻辑
+  // ==========================================
   function getDataRows() {
     return Array.from(document.querySelectorAll('tbody tr[style*="cursor:pointer"]'));
   }
@@ -102,7 +111,6 @@
     });
   }
 
-  // ---------- 单元格更新 ----------
   function updatePriceCell(cell, price) {
     if (!cell) return;
     const container = cell.querySelector('[class*="Price__PriceTransition"]');
@@ -158,7 +166,9 @@
     }
   }
 
-  // ---------- 拉取 ----------
+  // ==========================================
+  // 4. 数据拉取
+  // ==========================================
   async function fetchListing() {
     try {
       const res = await fetch(`${API_BASE}/listing?start=${PAGE_START}&limit=${PAGE_LIMIT}`);
@@ -170,13 +180,85 @@
     }
   }
 
-  // ---------- 启动 ----------
+  // ==========================================
+  // 5. 拦截所有跳转真实网站的链接
+  // ==========================================
+  function neutralizeLinks() {
+    // 1. 拦截点击事件
+    document.addEventListener('click', function (e) {
+      const anchor = e.target.closest('a');
+      if (anchor) {
+        const href = anchor.getAttribute('href') || '';
+        // 拦截相对路径、CMC 官方域名等
+        if (
+          href.startsWith('/') || 
+          href.includes('coinmarketcap.com') || 
+          href.includes('dex.coinmarketcap.com')
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          // 强制跳转到当前域名首页
+          window.location.href = '/'; 
+        }
+      }
+    }, true); // 使用捕获阶段拦截，优先级最高
+
+    // 2. 重写 DOM 中的 href 属性（让鼠标悬浮时显示真实地址为我们的首页）
+    function rewriteHrefs() {
+      document.querySelectorAll('a').forEach(anchor => {
+        const href = anchor.getAttribute('href');
+        if (href && (
+            href.startsWith('/') || 
+            href.includes('coinmarketcap.com') || 
+            href.includes('dex.coinmarketcap.com')
+        )) {
+          // 如果不是我们自己的根目录，才重写
+          if (href !== '/') {
+            anchor.setAttribute('href', '/');
+            // 移除 target="_blank" 防止新开标签页
+            anchor.removeAttribute('target'); 
+          }
+        }
+      });
+    }
+
+    rewriteHrefs();
+
+    // 3. 使用 MutationObserver 监听 React 动态渲染的新节点
+    const observer = new MutationObserver((mutations) => {
+      let shouldRewrite = false;
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          shouldRewrite = true;
+          break;
+        }
+      }
+      if (shouldRewrite) {
+        rewriteHrefs();
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  // ==========================================
+  // 6. 启动与初始化
+  // ==========================================
   function start() {
+    // 优先解析静态快照数据，点亮首屏表格
     const initial = parseInitialData();
     if (initial && initial.length) {
       bindRows(initial);
-      applyData(initial); // 用源码数据先“点亮”一次，保证格式统一
+      applyData(initial); // 确保首屏格式统一
     }
+    
+    // 启动跳转拦截
+    neutralizeLinks();
+
+    // 拉取最新行情数据（以此覆盖静态数据），并设置 30 秒轮询
     fetchListing();
     setInterval(fetchListing, REFRESH_INTERVAL);
   }
