@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = '/api';
+  const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
