@@ -8,68 +8,123 @@
   const PAGE_SIZE = 100;
 
   // ==========================================
-  // 0. 终极物理删除（把不需要的 HTML 直接抠掉）
+  // 0. 注入我们自己手写的纯净版 CSS
   // ==========================================
-  function forceRemoveElements() {
-    // 1. 在 head 注入最高优先级的 CSS（防止页面打开瞬间闪烁）
-    if (!document.getElementById('cmc-force-css')) {
-      const style = document.createElement('style');
-      style.id = 'cmc-force-css';
-      style.innerHTML = `
-        /* 顶部的 4 个大卡片 (Market Status, Trending Coins 等) */
-        .leaRTT { display: none !important; }
-        
-        /* 中间的 AI 标签 (Topic, Try Agentic Charts 等) */
-        [data-test="homepage-ai-insights"], .jsdkmm { display: none !important; }
-        
-        /* 表格上方的工具栏 (All Networks, Filters, Columns 等) */
-        [data-test="table-control"] { display: none !important; }
-        
-        /* 顶部导航和二级菜单 */
-        .rLYzrW_global-header, [data-test="global-header"] { display: none !important; }
-        [data-test="homepage-table-header"] { display: none !important; }
-        
-        /* 标题和底部所有东西 */
-        .style__HeaderWrapper-sc-402f0830-1 { display: none !important; }
-        [data-test="global-newsletter"], [data-test="global-footer"], 
-        [data-test="global-bottom-stats-bar"], footer, .inner-banner { display: none !important; }
-        
-        /* 页面贴顶 */
-        .main-content { padding-top: 10px !important; }
-        .style__HomepageContainer-sc-402f0830-2 { padding-top: 0 !important; }
-      `;
-      document.head.appendChild(style);
-    }
+  function injectCustomCSS() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      /* 全局重置 */
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #ffffff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #0d1421;
+      }
+      #custom-app {
+        width: 100%;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px 16px;
+      }
+      .page-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 20px;
+        color: #0d1421;
+      }
 
-    // 2. 物理删除 DOM 节点
-    const selectors = [
-      '.leaRTT', 
-      '[data-test="homepage-ai-insights"]', 
-      '.jsdkmm', 
-      '[data-test="table-control"]',
-      '.rLYzrW_global-header',
-      '[data-test="homepage-table-header"]',
-      '.style__HeaderWrapper-sc-402f0830-1',
-      '[data-test="global-newsletter"]',
-      '[data-test="global-footer"]',
-      '[data-test="global-bottom-stats-bar"]',
-      'footer',
-      '.inner-banner'
-    ];
+      /* 表格样式 */
+      .crypto-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        text-align: right;
+      }
+      .crypto-table th, .crypto-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #eff2f5;
+        white-space: nowrap;
+      }
+      .crypto-table th {
+        font-size: 12px;
+        font-weight: 500;
+        color: #616e85;
+        cursor: pointer;
+        text-align: right;
+      }
+      .crypto-table th:nth-child(1), .crypto-table td:nth-child(1),
+      .crypto-table th:nth-child(2), .crypto-table td:nth-child(2),
+      .crypto-table th:nth-child(3), .crypto-table td:nth-child(3) {
+        text-align: left;
+      }
+      .crypto-table tbody tr:hover {
+        background-color: #f8fafd;
+      }
 
-    selectors.forEach(sel => {
-      document.querySelectorAll(sel).forEach(el => {
-        // 直接从 DOM 树中移除
-        el.remove(); 
-      });
-    });
-  }
+      /* 币种名称区域 */
+      .coin-name-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .coin-logo {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+      }
+      .coin-symbol {
+        color: #a6b0c3;
+        font-size: 12px;
+        margin-left: 4px;
+      }
 
-  // 3. 启动“守卫”，只要 React 敢偷偷重建，就立刻秒杀
-  function startGuard() {
-    forceRemoveElements();
-    // 轮询清理，因为 React 可能会在几百毫秒后重绘
-    setInterval(forceRemoveElements, 200); 
+      /* 涨跌颜色 */
+      .pct-up { color: #16c784; }
+      .pct-down { color: #ea3943; }
+
+      /* 走势图 */
+      .sparkline {
+        width: 100px;
+        height: 30px;
+        object-fit: contain;
+      }
+
+      /* 翻页控件 */
+      .pagination-wrapper {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin-top: 20px;
+        gap: 8px;
+      }
+      .page-btn {
+        padding: 6px 12px;
+        border: 1px solid #cfd6e4;
+        border-radius: 6px;
+        background: #fff;
+        color: #0d1421;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+      }
+      .page-btn:hover:not(:disabled) {
+        background: #f8fafd;
+      }
+      .page-btn:disabled {
+        color: #a6b0c3;
+        cursor: not-allowed;
+        border-color: #eff2f5;
+      }
+      .page-info {
+        margin-left: 10px;
+        font-size: 14px;
+        color: #616e85;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   // ==========================================
@@ -106,181 +161,132 @@
   }
 
   // ==========================================
-  // 2. 渲染表格
+  // 2. 渲染纯净表格
   // ==========================================
-  function renderTable(page) {
-    const tbody = document.querySelector('tbody');
-    if (!tbody) return;
-    const templateRow = tbody.querySelector('tr[style*="cursor:pointer"]') || tbody.querySelector('tr');
-    if (!templateRow) return;
-
-    const startIdx = (page - 1) * PAGE_SIZE;
+  function renderCustomTable() {
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
     const pageData = allCoins.slice(startIdx, startIdx + PAGE_SIZE);
     
-    const skeletonRows = Array.from(tbody.querySelectorAll('tr')).filter(tr => !tr.hasAttribute('style'));
-    tbody.innerHTML = '';
-    skeletonRows.forEach(tr => tbody.appendChild(tr));
-
-    pageData.forEach((coin) => {
-      const tr = templateRow.cloneNode(true);
-      tr.setAttribute('data-coin-id', String(coin.id));
+    let rowsHtml = '';
+    pageData.forEach(coin => {
+      const pct1hClass = coin.percentChange1h >= 0 ? 'pct-up' : 'pct-down';
+      const pct24hClass = coin.percentChange24h >= 0 ? 'pct-up' : 'pct-down';
+      const pct7dClass = coin.percentChange7d >= 0 ? 'pct-up' : 'pct-down';
       
-      const rankP = tr.querySelectorAll('td')[1].querySelector('p');
-      if (rankP) rankP.textContent = coin.rank;
+      const arrow1h = coin.percentChange1h >= 0 ? '▲' : '▼';
+      const arrow24h = coin.percentChange24h >= 0 ? '▲' : '▼';
+      const arrow7d = coin.percentChange7d >= 0 ? '▲' : '▼';
 
-      const link = tr.querySelectorAll('td')[2].querySelector('a');
-      if (link) {
-        link.href = 'javascript:void(0);';
-        const img = link.querySelector('img.coin-logo');
-        if (img) img.src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`;
-        const nameP = link.querySelector('.coin-item-name');
-        if (nameP) nameP.textContent = coin.name;
-        const symbolP = link.querySelector('.coin-item-symbol');
-        if (symbolP) symbolP.textContent = coin.symbol;
-      }
-
-      const tds = tr.querySelectorAll('td');
-      
-      const priceContainer = tds[3].querySelector('[class*="Price__PriceTransition"]');
-      if (priceContainer) priceContainer.textContent = formatPrice(coin.price);
-
-      [coin.percentChange1h, coin.percentChange24h, coin.percentChange7d].forEach((pct, i) => {
-        const cell = tds[4 + i];
-        const wrapper = cell.querySelector('span[class*="PercentageView"]');
-        if (wrapper) {
-          const textNodes = Array.from(wrapper.childNodes).filter(n => n.nodeType === 3);
-          if (textNodes.length > 0) textNodes[0].textContent = formatPercent(pct);
-          wrapper.style.color = pct >= 0 ? '#16C784' : '#EA3943';
-        }
-      });
-
-      const spans8 = tds[7].querySelectorAll('span');
-      for (let i = spans8.length - 1; i >= 0; i--) {
-        if (spans8[i].children.length === 0) { spans8[i].textContent = formatCompact(coin.marketCap); break; }
-      }
-      const spans9 = tds[8].querySelectorAll('span');
-      for (let i = spans9.length - 1; i >= 0; i--) {
-        if (spans9[i].children.length === 0) { spans9[i].textContent = formatCompact(coin.volume24h); break; }
-      }
-
-      const supplyVal = tds[9].querySelector('.circulating-supply-value span');
-      if (supplyVal) supplyVal.textContent = formatSupply(coin.circulatingSupply);
-
-      const sparklineImg = tds[11].querySelector('img');
-      if (sparklineImg) sparklineImg.src = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
-
-      tbody.appendChild(tr);
+      rowsHtml += `
+        <tr>
+          <td>${coin.rank}</td>
+          <td>
+            <div class="coin-name-wrap" onclick="alert('【币种详情】\\n名称: ${coin.name}\\n符号: ${coin.symbol}\\n价格: ${formatPrice(coin.price)}\\n市值: ${formatCompact(coin.marketCap)}')">
+              <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" class="coin-logo" onerror="this.src='https://s2.coinmarketcap.com/static/cloud/img/coinmarketcap_1.svg'"/>
+              <span>${coin.name}</span>
+              <span class="coin-symbol">${coin.symbol}</span>
+            </div>
+          </td>
+          <td>${formatPrice(coin.price)}</td>
+          <td class="${pct1hClass}">${arrow1h} ${formatPercent(coin.percentChange1h)}</td>
+          <td class="${pct24hClass}">${arrow24h} ${formatPercent(coin.percentChange24h)}</td>
+          <td class="${pct7dClass}">${arrow7d} ${formatPercent(coin.percentChange7d)}</td>
+          <td>${formatCompact(coin.marketCap)}</td>
+          <td>${formatCompact(coin.volume24h)}</td>
+          <td>${formatSupply(coin.circulatingSupply)} ${coin.symbol}</td>
+          <td>
+            <img src="https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg" class="sparkline" onerror="this.style.display='none'"/>
+          </td>
+        </tr>
+      `;
     });
 
-    updatePaginationUI(page);
-  }
+    // 整体替换 body 的内容为我们自建的极简骨架
+    document.body.innerHTML = `
+      <div id="custom-app">
+        <div class="page-title">Cryptocurrency Prices by Market Cap</div>
+        <table class="crypto-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Price</th>
+              <th>1h %</th>
+              <th>24h %</th>
+              <th>7d %</th>
+              <th>Market Cap</th>
+              <th>Volume(24h)</th>
+              <th>Circulating Supply</th>
+              <th>7d Price%</th>
+            </tr>
+          </thead>
+          <tbody id="custom-tbody">
+            ${rowsHtml}
+          </tbody>
+        </table>
+        
+        <div class="pagination-wrapper">
+          <button id="btn-prev" class="page-btn" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+          <span class="page-info">Page ${currentPage} of ${Math.ceil(allCoins.length / PAGE_SIZE)}</span>
+          <button id="btn-next" class="page-btn" ${currentPage * PAGE_SIZE >= allCoins.length ? 'disabled' : ''}>Next</button>
+        </div>
+      </div>
+    `;
 
-  // ==========================================
-  // 3. 接管分页
-  // ==========================================
-  function updatePaginationUI(page) {
-    const totalPages = Math.ceil(allCoins.length / PAGE_SIZE);
-    const paginationUl = document.querySelector('.pagination');
-    if (!paginationUl) return;
-
-    let html = '';
-    if (page > 1) html += `<li class="previous"><a href="#" data-page="${page - 1}" class="chevron">&#10094;</a></li>`;
-    else html += `<li class="previous disabled"><span class="chevron">&#10094;</span></li>`;
-
-    let startP = Math.max(1, page - 2);
-    let endP = Math.min(totalPages, page + 2);
-
-    if (startP > 1) html += `<li class="page"><a href="#" data-page="1">1</a></li>`;
-    if (startP > 2) html += `<li class="break">...</li>`;
-
-    for (let i = startP; i <= endP; i++) {
-      if (i === page) html += `<li class="page active"><a href="#" aria-current="page">${i}</a></li>`;
-      else html += `<li class="page"><a href="#" data-page="${i}">${i}</a></li>`;
-    }
-
-    if (endP < totalPages - 1) html += `<li class="break">...</li>`;
-    if (endP < totalPages) html += `<li class="page"><a href="#" data-page="${totalPages}">${totalPages}</a></li>`;
-
-    if (page < totalPages) html += `<li class="next"><a href="#" data-page="${page + 1}" class="chevron">&#10095;</a></li>`;
-    else html += `<li class="next disabled"><span class="chevron">&#10095;</span></li>`;
-
-    paginationUl.innerHTML = html;
-
-    const footerText = document.querySelector('.table_footer-left');
-    if (footerText) {
-      const start = (page - 1) * PAGE_SIZE + 1;
-      const end = Math.min(page * PAGE_SIZE, allCoins.length);
-      footerText.textContent = `Showing ${start} - ${end} out of ${allCoins.length}`;
-    }
-
-    paginationUl.querySelectorAll('a[data-page]').forEach(a => {
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        currentPage = parseInt(a.getAttribute('data-page'), 10);
-        renderTable(currentPage);
+    // 绑定翻页事件
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderCustomTable();
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      }
+    });
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      if (currentPage * PAGE_SIZE < allCoins.length) {
+        currentPage++;
+        renderCustomTable();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     });
   }
 
   // ==========================================
-  // 4. 拦截点击
-  // ==========================================
-  function neutralizeLinks() {
-    document.addEventListener('click', function (e) {
-      const anchor = e.target.closest('a');
-      if (anchor && !anchor.hasAttribute('data-page')) {
-        const tr = anchor.closest('tr');
-        const coinId = tr ? tr.getAttribute('data-coin-id') : null;
-        if (coinId) {
-          e.preventDefault();
-          e.stopPropagation();
-          const coinData = allCoins.find(c => String(c.id) === String(coinId));
-          if (coinData) {
-            alert(`【币种详情】\n名称: ${coinData.name} (${coinData.symbol})\n排名: #${coinData.rank}\n价格: ${formatPrice(coinData.price)}\n市值: ${formatCompact(coinData.marketCap)}`);
-          }
-          return;
-        }
-        const href = anchor.getAttribute('href') || '';
-        if (href.startsWith('/') || href.includes('coinmarketcap.com')) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      }
-    }, true);
-  }
-
-  // ==========================================
-  // 5. 启动
+  // 3. 启动应用
   // ==========================================
   async function start() {
-    startGuard(); // 启动物理删除守卫
-    neutralizeLinks();
+    // 1. 在页面最早期注入清洗全局的样式
+    injectCustomCSS();
+    
+    // 2. 显示一个加载提示（此时原网页结构还在，但我们会瞬间覆盖它）
+    document.body.innerHTML = '<div style="text-align:center; padding: 50px; font-size: 18px; color: #616e85;">Loading Market Data...</div>';
 
     try {
-      const tbody = document.querySelector('tbody');
-      if (tbody) tbody.style.opacity = '0.5';
-
+      // 3. 请求后端全量数据
       const res = await fetch(`${API_BASE}/listing/all`);
       const json = await res.json();
       
       if (Array.isArray(json.data) && json.data.length > 0) {
+        // 4. 按排名严格排序
         allCoins = json.data.sort((a, b) => (a.rank || 9999999) - (b.rank || 9999999));
         
+        // 5. 解析 URL 里的页码
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = parseInt(urlParams.get('page'), 10);
         currentPage = (pageParam && pageParam > 0) ? pageParam : 3;
 
-        renderTable(currentPage);
+        // 6. 渲染属于我们的纯净版页面
+        renderCustomTable();
+      } else {
+        document.body.innerHTML = '<div style="text-align:center; padding: 50px;">No data available.</div>';
       }
     } catch (e) {
       console.error('[inject] 数据加载失败:', e.message);
-    } finally {
-      if (document.querySelector('tbody')) document.querySelector('tbody').style.opacity = '1';
+      document.body.innerHTML = '<div style="text-align:center; padding: 50px; color: red;">Failed to load data. Please check your API server.</div>';
     }
   }
 
+  // 因为我们要直接覆盖原网页，所以等 DOM 一准备就绪就立刻执行
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start);
   } else {
