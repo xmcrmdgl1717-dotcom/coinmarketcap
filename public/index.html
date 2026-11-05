@@ -15,11 +15,22 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafd; color: var(--text-primary); font-size: 14px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
+        /* ================= 价格闪烁动画 (CMC同款) ================= */
+        @keyframes flash-up {
+            0% { background-color: rgba(22, 199, 132, 0.3); }
+            100% { background-color: transparent; }
+        }
+        @keyframes flash-down {
+            0% { background-color: rgba(234, 57, 67, 0.3); }
+            100% { background-color: transparent; }
+        }
+        .price-flash-up { animation: flash-up 1s ease-out; }
+        .price-flash-down { animation: flash-down 1s ease-out; }
+
         /* ================= 右上角悬浮菜单 ================= */
         .floating-controls { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px; }
         .control-btn { width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; border: 1px solid var(--border-color); transition: transform 0.2s; }
         .control-btn:hover { transform: scale(1.05); }
-        
         .dropdown-menu { display: none; position: absolute; top: 50px; right: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); width: 100px; overflow: hidden; }
         .dropdown-menu.show { display: block; }
         .dropdown-menu div { padding: 10px 16px; cursor: pointer; font-size: 13px; transition: background 0.2s; text-align: center; }
