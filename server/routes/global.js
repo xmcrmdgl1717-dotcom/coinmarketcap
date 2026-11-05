@@ -6,7 +6,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   const key = 'global-metrics';
   const cached = cache.get(key);
-  if (cached) return res.json({ ...cached, cached: true });
+  if (cached) return res.json(cached);
 
   try {
     const [globalData, fearGreed] = await Promise.all([
@@ -14,11 +14,10 @@ router.get('/', async (req, res) => {
       cmc.fetchFearGreed(),
     ]);
     const result = { ...globalData, fearGreed };
-    cache.set(key, result, 60 * 1000); // 缓存 1 分钟
+    cache.set(key, result, 60 * 1000);
     return res.json(result);
   } catch (err) {
-    console.error('[global] failed:', err.message);
-    return res.status(502).json({ error: 'global metrics unavailable' });
+    return res.status(502).json({ error: 'global unavailable' });
   }
 });
 module.exports = router;
