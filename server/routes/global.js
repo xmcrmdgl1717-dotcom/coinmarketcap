@@ -23,7 +23,6 @@ router.get('/', async (req, res) => {
     });
     return res.json({ ...result, cached: false });
   } catch (err) {
-    console.error('[global] failed:', err.message);
     return res.status(502).json({ error: 'global metrics unavailable' });
   }
 });
