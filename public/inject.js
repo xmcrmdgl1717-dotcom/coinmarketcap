@@ -9,29 +9,35 @@
   const PAGE_SIZE = 100;
 
   // ==========================================
-  // 0. 暴力隐藏不需要的模块
+  // 0. 暴力隐藏不需要的模块（只留表格）
   // ==========================================
   function hideUnwantedElements() {
     // 1. 注入全局 CSS 样式
     const style = document.createElement('style');
-    style.id = 'cmc-hide-style';
+    style.id = 'cmc-clean-style';
     style.innerHTML = `
-      /* 顶部主导航 (Logo, Markets等) */
+      /* 顶部大导航 (Logo, Markets, 搜索框) */
       .rLYzrW_global-header, [data-test="global-header"] { display: none !important; }
       
-      /* 顶部二级菜单 (Top, Trending, Watchlist等) */
+      /* 二级导航标签 (Top, Trending, Watchlist) */
       [data-test="homepage-table-header"] { display: none !important; }
       
-      /* 页面标题 (Today's Cryptocurrency Prices...) */
+      /* 页面主标题 (Today's Cryptocurrency Prices...) */
       .style__HeaderWrapper-sc-402f0830-1 { display: none !important; }
       
-      /* 表格上方的卡片区 (Highlights, AI 问答) */
-      .styles__HighlightsContainer-sc-9bffcd02-0, .dKlzxG_wrapper { display: none !important; }
+      /* 顶部 4 个大卡片 (Market Status, Trending Coins, Derivatives, Community) */
+      .leaRTT { display: none !important; }
+      
+      /* 中间的 AI 标签区 (Topic, Try Agentic Charts, AI alert) */
+      [data-test="homepage-ai-insights"], .jsdkmm { display: none !important; }
+      
+      /* 表格上方的工具栏 (Coins, DexScan, 1h, 24h, Filters, Columns) */
+      [data-test="table-control"] { display: none !important; }
       
       /* 底部的 Newsletter 订阅 */
       [data-test="global-newsletter"], .block-newsletter { display: none !important; }
       
-      /* 底部 Footer 链接 */
+      /* 底部 Footer 链接区 */
       [data-test="global-footer"], footer { display: none !important; }
       
       /* 底部固定悬浮状态栏 */
@@ -39,21 +45,24 @@
       
       /* Cookie 提示条 */
       #onetrust-banner-sdk, .cmc-bottom-popup, div[aria-label="Cookie banner"] { display: none !important; }
-
+      
       /* 顶部广告横幅 */
       .inner-banner { display: none !important; }
       
-      /* 让主容器顶部贴近页面 */
+      /* 调整主体容器的顶部留白，让表格紧贴上方 */
       .main-content { padding-top: 20px !important; }
+      .grid { padding-left: 16px !important; padding-right: 16px !important; }
     `;
     document.head.appendChild(style);
 
-    // 2. 直接物理移除 DOM 节点（防止 React 后续重新渲染出来）
+    // 2. 物理移除 DOM 节点（防止 React 延迟渲染又覆盖出来）
     const selectors = [
       '.rLYzrW_global-header', '[data-test="global-header"]',
       '[data-test="homepage-table-header"]',
       '.style__HeaderWrapper-sc-402f0830-1',
-      '.styles__HighlightsContainer-sc-9bffcd02-0', '.dKlzxG_wrapper',
+      '.leaRTT',
+      '[data-test="homepage-ai-insights"]', '.jsdkmm',
+      '[data-test="table-control"]',
       '[data-test="global-newsletter"]', '.block-newsletter',
       '[data-test="global-footer"]', 'footer',
       '[data-test="global-bottom-stats-bar"]',
@@ -69,7 +78,8 @@
     };
 
     nukeNodes();
-    // React 水合时可能会把节点重新插回来，延迟多次清理
+    // 定时多次清理，确保干掉 React 后渲染的内容
+    setTimeout(nukeNodes, 100);
     setTimeout(nukeNodes, 500);
     setTimeout(nukeNodes, 1500);
     setTimeout(nukeNodes, 3000);
