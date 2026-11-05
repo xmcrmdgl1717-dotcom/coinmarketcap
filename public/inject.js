@@ -60,10 +60,16 @@
 
       // 恐慌贪婪指数
       const fg = global.fearGreed || {};
-      if (document.getElementById('fg-value-d')) document.getElementById('fg-value-d').textContent = fg.value ?? '--';
-      if (document.getElementById('fg-label-d')) document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
-      if (document.getElementById('fg-value-m')) document.getElementById('fg-value-m').textContent = fg.value ?? '--';
-      if (document.getElementById('fg-label-m')) document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
+      // 桌面端
+      if (document.getElementById('fg-value-d')) {
+        document.getElementById('fg-value-d').textContent = fg.value ?? '--';
+        document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
+      }
+      // 移动端
+      if (document.getElementById('fg-value-m')) {
+        document.getElementById('fg-value-m').textContent = fg.value ?? '--';
+        document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
+      }
       
       // 总市值
       const mcapStr = formatCompact(global.totalMarketCap);
@@ -75,16 +81,36 @@
       if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
       if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
 
-      // 桌面端 Trending 轮播
+      // 趋势数据
       trendingData = trending.data || [];
+      
+      // 桌面端轮播
       if (trendingData.length > 0 && document.getElementById('trending-list')) {
         renderTrendingPage(0);
         startTrendingRotation();
       }
 
-      // 桌面端 Derivatives
+      // 桌面端衍生品
       if (document.getElementById('derivatives-content')) {
         renderDerivativesCard(derivatives);
+      }
+
+      // 移动端：渲染第一名 Trending 币种
+      if (trendingData.length > 0 && document.getElementById('mobile-trending-box')) {
+        const topCoin = trendingData[0];
+        const pct = topCoin.percentChange24h || 0;
+        const cls = pct >= 0 ? 'text-up' : 'text-down';
+        const arrow = pct >= 0 ? '▲' : '▼';
+        
+        document.getElementById('mobile-trending-box').innerHTML = `
+            <div class="m-card-title">Trending Coin</div>
+            <div class="coin-info" style="margin-bottom: 4px;">
+                <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${topCoin.id}.png" />
+                <span class="coin-name">${topCoin.symbol}</span>
+            </div>
+            <div class="m-value" style="font-size: 14px;">${formatPrice(topCoin.price)}</div>
+            <div class="${cls}" style="font-size: 12px; font-weight: 600;">${arrow} ${formatPercent(pct)}</div>
+        `;
       }
 
     } catch (e) {
@@ -93,7 +119,7 @@
   }
 
   // ==========================================
-  // 3. Trending & Derivatives (仅桌面端有 DOM 时渲染)
+  // 3. 桌面端 Trending 轮播
   // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
@@ -139,6 +165,9 @@
     }, 4000);
   }
 
+  // ==========================================
+  // 4. 桌面端 Derivatives 渲染
+  // ==========================================
   function renderDerivativesCard(derivatives) {
     const totalLiq = derivatives.totalLiquidations || 0;
     const longLiq = derivatives.longLiquidations || 0;
@@ -170,7 +199,7 @@
   }
 
   // ==========================================
-  // 4. 底部抽屉交互
+  // 5. 底部抽屉交互
   // ==========================================
   window.openCoinDetail = function(coinId) {
     const coin = currentPageData.find(c => String(c.id) === String(coinId));
@@ -207,7 +236,7 @@
   }
 
   // ==========================================
-  // 5. 表格渲染
+  // 6. 表格渲染
   // ==========================================
   let currentPageData = [];
 
@@ -290,7 +319,7 @@
   }
 
   // ==========================================
-  // 6. 初始化
+  // 7. 初始化
   // ==========================================
   async function init() {
     setupBottomSheet();
