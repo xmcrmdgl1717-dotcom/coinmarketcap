@@ -5,6 +5,12 @@
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
+  // 轮播相关变量
+  let trendingData = [];
+  let trendingPage = 0;
+  const TRENDING_PAGE_SIZE = 5;
+  let trendingTimer = null;
+
   // --- 格式化函数 ---
   function formatPrice(p) {
     if (p == null || isNaN(p) || p === 0) return '--';
@@ -60,59 +66,102 @@
       const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
       document.getElementById('global-mcap').innerHTML = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
 
-      // 2. Trending Coins 渲染
-      const trendList = trending.data || [];
-      let trendHtml = '';
-      trendList.slice(0, 5).forEach((coin, i) => {
-        const pct = coin.percentChange24h || 0;
-        const cls = pct >= 0 ? 'text-up' : 'text-down';
-        trendHtml += `
-          <div class="trend-row">
-            <div class="trend-left">
-              <span style="color:var(--text-secondary); width:12px;">${i + 1}</span>
-              <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" onerror="this.style.display='none'"/>
-              <span>${coin.symbol}</span>
-            </div>
-            <div>
-              <span style="font-weight:600;">${formatPrice(coin.price)}</span>
-              <span class="${cls}" style="margin-left:8px;font-size:12px;">${pct >= 0 ? '▲' : '▼'} ${formatPercent(pct)}</span>
-            </div>
-          </div>
-        `;
-      });
-      document.getElementById('trending-list').innerHTML = trendHtml || '<div style="color:var(--text-secondary); text-align:center; padding:20px;">暂无数据</div>';
+      // 2. Trending Coins 数据处理（准备轮播）
+      trendingData = trending.data || [];
+      if (trendingData.length > 0) {
+        renderTrendingPage(0);
+        startTrendingRotation();
+      } else {
+        document.getElementById('trending-list').innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding:20px;">暂无数据</div>';
+      }
 
       // 3. Derivatives 渲染
-      const derHtml = `
-        <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(derivatives.totalLiquidations)}</span></div>
-        <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(derivatives.longLiquidations)}</span></div>
-        <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(derivatives.shortLiquidations)}</span></div>
-        
-        <div class="mini-chart">
-           <div class="bar" style="height:80%; background:#ea3943;"></div>
-           <div class="bar" style="height:30%; background:#16c784;"></div>
-           <div class="bar" style="height:50%; background:#ea3943;"></div>
-           <div class="bar" style="height:90%; background:#16c784;"></div>
-           <div class="bar" style="height:20%; background:#ea3943;"></div>
-           <div class="bar" style="height:40%; background:#16c784;"></div>
-           <div class="bar" style="height:60%; background:#ea3943;"></div>
-           <div class="bar" style="height:70%; background:#16c784;"></div>
-        </div>
-
-        <div class="ms-bottom">
-            <div class="inner-card">
-                <div class="stat-row"><span class="stat-label">Open Interest</span><span class="stat-value">${formatCompact(derivatives.openInterest)}</span></div>
-            </div>
-            <div class="inner-card">
-                <div class="stat-row"><span class="stat-label">Volume (24h)</span><span class="stat-value">${formatCompact(derivatives.volume24h)}</span></div>
-            </div>
-        </div>
-      `;
-      document.getElementById('derivatives-content').innerHTML = derHtml;
+      renderDerivativesCard(derivatives);
 
     } catch (e) {
       console.warn('[topCards] 数据加载失败:', e);
     }
+  }
+
+  // --- Trending Coins 轮播逻辑 ---
+  function renderTrendingPage(pageIndex) {
+    const listEl = document.getElementById('trending-list');
+    const pageIndicator = document.getElementById('trending-page-indicator');
+    if (!listEl) return;
+
+    const start = pageIndex * TRENDING_PAGE_SIZE;
+    const pageData = trendingData.slice(start, start + TRENDING_PAGE_SIZE);
+    
+    let html = '';
+    pageData.forEach((coin, i) => {
+      const pct = coin.percentChange24h || 0;
+      const cls = pct >= 0 ? 'text-up' : 'text-down';
+      html += `
+        <div class="trend-row">
+          <div class="trend-left">
+            <span style="color:var(--text-secondary); width:12px;">${start + i + 1}</span>
+            <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" onerror="this.style.display='none'"/>
+            <span>${coin.symbol}</span>
+          </div>
+          <div>
+            <span style="font-weight:600;">${formatPrice(coin.price)}</span>
+            <span class="${cls}" style="margin-left:8px;font-size:12px;">${pct >= 0 ? '▲' : '▼'} ${formatPercent(pct)}</span>
+          </div>
+        </div>
+      `;
+    });
+    listEl.innerHTML = html;
+
+    if (pageIndicator) {
+      const totalPages = Math.ceil(trendingData.length / TRENDING_PAGE_SIZE);
+      pageIndicator.textContent = `${pageIndex + 1}/${totalPages} >`;
+    }
+  }
+
+  function startTrendingRotation() {
+    if (trendingTimer) clearInterval(trendingTimer);
+    trendingTimer = setInterval(() => {
+      const totalPages = Math.ceil(trendingData.length / TRENDING_PAGE_SIZE);
+      if (totalPages <= 1) return;
+      trendingPage = (trendingPage + 1) % totalPages;
+      renderTrendingPage(trendingPage);
+    }, 4000); // 每 4 秒切换一次
+  }
+
+  // --- Derivatives 渲染 ---
+  function renderDerivativesCard(derivatives) {
+    const totalLiq = derivatives.totalLiquidations || 0;
+    const longLiq = derivatives.longLiquidations || 0;
+    const shortLiq = derivatives.shortLiquidations || 0;
+    
+    // 生成随机高度和颜色的柱子模拟图表
+    let barsHtml = '';
+    for (let i = 0; i < 12; i++) {
+      const isRed = Math.random() > 0.4;
+      const height = Math.floor(Math.random() * 60) + 30; 
+      const color = isRed ? '#ea3943' : '#16c784';
+      barsHtml += `<div class="bar" style="height:${height}%; background:${color};"></div>`;
+    }
+
+    const derHtml = `
+      <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(totalLiq)}</span></div>
+      <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(longLiq)}</span></div>
+      <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(shortLiq)}</span></div>
+      
+      <div class="mini-chart">
+         ${barsHtml}
+      </div>
+
+      <div class="ms-bottom">
+          <div class="inner-card" style="padding: 8px 12px;">
+              <div class="stat-row" style="margin:0;"><span class="stat-label">Open Interest</span><span class="stat-value">${formatCompact(derivatives.openInterest)}</span></div>
+          </div>
+          <div class="inner-card" style="padding: 8px 12px;">
+              <div class="stat-row" style="margin:0;"><span class="stat-label">Volume (24h)</span><span class="stat-value">${formatCompact(derivatives.volume24h)}</span></div>
+          </div>
+      </div>
+    `;
+    document.getElementById('derivatives-content').innerHTML = derHtml;
   }
 
   // --- 渲染底部表格 ---
