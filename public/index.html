@@ -15,26 +15,28 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafd; color: var(--text-primary); font-size: 14px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* 语言切换 */
-        .lang-switch-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
-        .lang-icon-btn { width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; border: 1px solid var(--border-color); }
-        .lang-dropdown { display: none; position: absolute; top: 50px; right: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); width: 120px; overflow: hidden; }
-        .lang-dropdown.show { display: block; }
-        .lang-dropdown div { padding: 10px 16px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
-        .lang-dropdown div:hover { background: var(--bg-hover); }
+        /* ================= 右上角悬浮菜单 ================= */
+        .floating-controls { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px; }
+        .control-btn { width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; border: 1px solid var(--border-color); transition: transform 0.2s; }
+        .control-btn:hover { transform: scale(1.05); }
+        
+        .dropdown-menu { display: none; position: absolute; top: 50px; right: 0; background: #fff; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border-color); width: 100px; overflow: hidden; }
+        .dropdown-menu.show { display: block; }
+        .dropdown-menu div { padding: 10px 16px; cursor: pointer; font-size: 13px; transition: background 0.2s; text-align: center; }
+        .dropdown-menu div:hover { background: var(--bg-hover); }
+        .dropdown-menu div.active { color: var(--up-color); font-weight: 600; background: #f0fdf9; }
 
-        /* 轮播图 */
+        /* ================= 轮播图 ================= */
         .banner-carousel { position: relative; width: 100%; aspect-ratio: 3/1; border-radius: 16px; overflow: hidden; margin-bottom: 24px; box-shadow: var(--shadow); background: #000; }
         .carousel-inner { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
         .carousel-item { flex-shrink: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px; box-sizing: border-box; }
         .carousel-item h2 { font-size: 24px; margin: 0 0 10px 0; font-weight: 700; line-height: 1.3; }
         .carousel-item p { font-size: 14px; margin: 0; opacity: 0.9; line-height: 1.4; }
-        
         .carousel-indicators { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
         .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.3s; }
         .carousel-dot.active { background: #fff; width: 16px; border-radius: 4px; }
 
-        /* 桌面端卡片 */
+        /* ================= 桌面端卡片 ================= */
         .top-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
         .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
         .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -62,7 +64,7 @@
         .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 4px; overflow: hidden;}
         .bar { flex: 1; border-radius: 2px 2px 0 0; }
 
-        /* 表格 */
+        /* ================= 表格 ================= */
         .table-wrapper { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border-color); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: right; }
         th { color: var(--text-secondary); font-weight: 500; font-size: 12px; padding: 16px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; background: #fff; }
@@ -80,7 +82,7 @@
         button { padding: 10px 16px; border: 1px solid #cfd6e4; background: #fff; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-primary); }
         button:disabled { color: #ccc; cursor: not-allowed; border-color: var(--border-color); }
 
-        /* 底部抽屉 */
+        /* ================= 底部抽屉 ================= */
         .bottom-sheet { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-overlay); z-index: 1000; visibility: hidden; opacity: 0; transition: all 0.3s ease; }
         .bottom-sheet.show { visibility: visible; opacity: 1; }
         .sheet-content { position: absolute; bottom: 0; left: 0; width: 100%; background: #fff; border-radius: 20px 20px 0 0; padding: 24px 20px; box-sizing: border-box; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1); max-height: 85vh; overflow-y: auto; }
@@ -99,7 +101,7 @@
         .sheet-chart { background: var(--bg-inner); padding: 16px; border-radius: 12px; text-align: center; }
         .sheet-chart img { width: 100%; max-width: 300px; height: auto; }
 
-        /* 移动端 */
+        /* ================= 移动端 ================= */
         .mobile-only { display: none; }
         @media (max-width: 768px) {
             .container { padding: 10px; }
@@ -108,8 +110,11 @@
             .banner-carousel { aspect-ratio: 2/1; border-radius: 12px; margin-bottom: 16px; }
             .carousel-item h2 { font-size: 18px; }
             .carousel-item p { font-size: 12px; }
-            .lang-switch-container { top: 15px; right: 15px; }
-            .lang-icon-btn { width: 32px; height: 32px; font-size: 16px; }
+            .floating-controls { top: 15px; right: 15px; gap: 8px; }
+            .control-btn { width: 32px; height: 32px; font-size: 16px; }
+            .dropdown-menu { top: 40px; width: 80px; }
+            .dropdown-menu div { padding: 8px 10px; font-size: 12px; }
+            
             .mobile-top-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
             .m-card { background: var(--bg-card); border-radius: 12px; padding: 12px; box-shadow: var(--shadow); border: 1px solid var(--border-color); display: flex; flex-direction: column; justify-content: center; min-height: 110px; }
             .m-card-title { font-size: 11px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;}
@@ -135,12 +140,28 @@
     </style>
 </head>
 <body>
-    <div class="lang-switch-container">
-        <div class="lang-icon-btn" id="lang-btn">🌐</div>
-        <div class="lang-dropdown" id="lang-dropdown">
-            <div data-lang="zh-CN">简体中文</div>
-            <div data-lang="zh-TW">繁體中文</div>
-            <div data-lang="en">English</div>
+    <!-- 悬浮控制区 -->
+    <div class="floating-controls">
+        <!-- 刷新频率控制 -->
+        <div style="position: relative;">
+            <div class="control-btn" id="refresh-btn" title="自动刷新频率">⏱️</div>
+            <div class="dropdown-menu" id="refresh-dropdown">
+                <div data-time="1000">1S</div>
+                <div data-time="5000" class="active">5S</div>
+                <div data-time="10000">10S</div>
+                <div data-time="30000">30S</div>
+                <div data-time="60000">1M</div>
+                <div data-time="300000">5M</div>
+            </div>
+        </div>
+        <!-- 语言切换控制 -->
+        <div style="position: relative;">
+            <div class="control-btn" id="lang-btn" title="切换语言">🌐</div>
+            <div class="dropdown-menu" id="lang-dropdown">
+                <div data-lang="zh-CN">简体</div>
+                <div data-lang="zh-TW">繁體</div>
+                <div data-lang="en">English</div>
+            </div>
         </div>
     </div>
 
@@ -150,7 +171,6 @@
             <div class="carousel-indicators" id="carousel-dots"></div>
         </div>
 
-        <!-- 桌面端 -->
         <div class="top-cards desktop-only">
             <div class="card">
                 <div class="card-title"><span data-i18n="market_status">Market Status</span> <span>查看全部 ></span></div>
@@ -183,7 +203,6 @@
             </div>
         </div>
 
-        <!-- 移动端 -->
         <div class="mobile-only mobile-top-grid">
             <div class="m-card">
                 <div class="m-card-title" data-i18n="fear_greed">Fear & Greed</div>
