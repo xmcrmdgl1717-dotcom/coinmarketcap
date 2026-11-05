@@ -49,46 +49,73 @@
       const trending = trendingRes.ok ? await trendingRes.json() : {};
       const derivatives = derivativesRes.ok ? await derivativesRes.json() : {};
 
-      // 1. Market Status
+      // 1. Market Status 渲染
       const fg = global.fearGreed || {};
-      const fgValue = fg.value ?? '--';
-      const fgLabel = fg.classification ?? 'Neutral';
-      const fgColor = fgValue >= 60 ? '#16c784' : fgValue >= 40 ? '#f0b90b' : '#ea3943';
+      document.getElementById('fg-value').textContent = fg.value ?? '--';
+      document.getElementById('fg-label').textContent = fg.classification ?? 'Neutral';
+      
+      const mcapStr = formatCompact(global.totalMarketCap);
+      const mcapChange = global.marketCapChange24h || 0;
+      const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
+      const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
+      document.getElementById('global-mcap').innerHTML = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
 
-      const card1 = document.querySelector('.card:nth-child(1) .card-content');
-      if (card1) card1.innerHTML = `
-        <div class="stat-row"><span class="stat-label">Fear & Greed</span><span class="stat-value" style="color:${fgColor};font-weight:700;">${fgValue} (${fgLabel})</span></div>
-        <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value">${formatCompact(global.totalMarketCap)} <span class="${(global.marketCapChange24h || 0) >= 0 ? 'text-up' : 'text-down'}">${(global.marketCapChange24h || 0) >= 0 ? '▲' : '▼'} ${formatPercent(global.marketCapChange24h)}</span></span></div>
-        <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
-      `;
-
-      // 2. Trending Coins
+      // 2. Trending Coins 渲染
       const trendList = trending.data || [];
       let trendHtml = '';
       trendList.slice(0, 5).forEach((coin, i) => {
         const pct = coin.percentChange24h || 0;
         const cls = pct >= 0 ? 'text-up' : 'text-down';
-        trendHtml += `<div class="stat-row"><div style="display:flex;gap:8px;align-items:center;"><span style="color:var(--text-secondary);font-size:12px;">${i + 1}</span><img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" style="width:20px;height:20px;border-radius:50%;" onerror="this.style.display='none'"/><span>${coin.symbol}</span></div><div><span>${formatPrice(coin.price)}</span><span class="${cls}" style="margin-left:8px;font-size:12px;">${pct >= 0 ? '▲' : '▼'} ${formatPercent(pct)}</span></div></div>`;
+        trendHtml += `
+          <div class="trend-row">
+            <div class="trend-left">
+              <span style="color:var(--text-secondary); width:12px;">${i + 1}</span>
+              <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" onerror="this.style.display='none'"/>
+              <span>${coin.symbol}</span>
+            </div>
+            <div>
+              <span style="font-weight:600;">${formatPrice(coin.price)}</span>
+              <span class="${cls}" style="margin-left:8px;font-size:12px;">${pct >= 0 ? '▲' : '▼'} ${formatPercent(pct)}</span>
+            </div>
+          </div>
+        `;
       });
-      const card2 = document.querySelector('.card:nth-child(2) .card-content');
-      if (card2) card2.innerHTML = trendHtml || '<div class="stat-label">暂无数据</div>';
+      document.getElementById('trending-list').innerHTML = trendHtml || '<div style="color:var(--text-secondary); text-align:center; padding:20px;">暂无数据</div>';
 
-      // 3. Derivatives
-      const card3 = document.querySelector('.card:nth-child(3) .card-content');
-      if (card3) card3.innerHTML = `
+      // 3. Derivatives 渲染
+      const derHtml = `
         <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(derivatives.totalLiquidations)}</span></div>
         <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(derivatives.longLiquidations)}</span></div>
         <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(derivatives.shortLiquidations)}</span></div>
-        <div class="stat-row" style="margin-top:8px;"><span class="stat-label">Open Interest</span><span class="stat-value">${formatCompact(derivatives.openInterest)}</span></div>
-        <div class="stat-row"><span class="stat-label">Volume (24h)</span><span class="stat-value">${formatCompact(derivatives.volume24h)}</span></div>
+        
+        <div class="mini-chart">
+           <div class="bar" style="height:80%; background:#ea3943;"></div>
+           <div class="bar" style="height:30%; background:#16c784;"></div>
+           <div class="bar" style="height:50%; background:#ea3943;"></div>
+           <div class="bar" style="height:90%; background:#16c784;"></div>
+           <div class="bar" style="height:20%; background:#ea3943;"></div>
+           <div class="bar" style="height:40%; background:#16c784;"></div>
+           <div class="bar" style="height:60%; background:#ea3943;"></div>
+           <div class="bar" style="height:70%; background:#16c784;"></div>
+        </div>
+
+        <div class="ms-bottom">
+            <div class="inner-card">
+                <div class="stat-row"><span class="stat-label">Open Interest</span><span class="stat-value">${formatCompact(derivatives.openInterest)}</span></div>
+            </div>
+            <div class="inner-card">
+                <div class="stat-row"><span class="stat-label">Volume (24h)</span><span class="stat-value">${formatCompact(derivatives.volume24h)}</span></div>
+            </div>
+        </div>
       `;
+      document.getElementById('derivatives-content').innerHTML = derHtml;
 
     } catch (e) {
       console.warn('[topCards] 数据加载失败:', e);
     }
   }
 
-  // --- 渲染表格 ---
+  // --- 渲染底部表格 ---
   function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
@@ -125,7 +152,13 @@
       html += `
         <tr>
           <td>${rank}</td>
-          <td><div class="coin-info" onclick="alert('【币种详情】\\n名称: ${name}\\n符号: ${symbol}\\n价格: ${formatPrice(price)}\\n市值: ${formatCompact(mcap)}')"><img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${id}.png" onerror="this.src='https://s2.coinmarketcap.com/static/cloud/img/coinmarketcap_1.svg'"/><span class="coin-name">${name}</span><span class="coin-symbol">${symbol}</span></div></td>
+          <td>
+            <div class="coin-info" onclick="alert('【币种详情】\\n名称: ${name}\\n符号: ${symbol}\\n价格: ${formatPrice(price)}\\n市值: ${formatCompact(mcap)}')">
+              <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${id}.png" onerror="this.src='https://s2.coinmarketcap.com/static/cloud/img/coinmarketcap_1.svg'"/>
+              <span class="coin-name">${name}</span>
+              <span class="coin-symbol">${symbol}</span>
+            </div>
+          </td>
           <td>${formatPrice(price)}</td>
           <td class="${c1}">${a1} ${formatPercent(p1)}</td>
           <td class="${c24}">${a24} ${formatPercent(p24)}</td>
