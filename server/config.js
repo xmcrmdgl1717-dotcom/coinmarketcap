@@ -1,4 +1,11 @@
-require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+
+// 仅在本地开发且存在 .env 文件时加载，Render 环境跳过
+const envPath = path.resolve(process.cwd(), '.env');
+if (process.env.NODE_ENV !== 'production' && fs.existsSync(envPath)) {
+  process.loadEnvFile(envPath);
+}
 
 module.exports = {
   port: Number(process.env.PORT) || 3001,
