@@ -137,7 +137,6 @@
 
     } catch (e) {
       console.warn('[Detail] 接口获取失败，保留原始图表', e);
-      // 如果获取失败，不要把图表搞消失，保留上一次的数据！
       const coinInfo = currentPageData.find(c => String(c.id) === String(coinId));
       if (coinInfo) {
         document.getElementById('sheet-coin-price').textContent = formatPrice(coinInfo.price);
@@ -227,7 +226,7 @@
   }
 
   // ==========================================
-  // 表格渲染核心逻辑（加了强制排序）
+  // 表格渲染核心逻辑（加了过滤，干掉无排名资产）
   // ==========================================
   function formatPrice(p) { if (!p) return '--'; if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (p >= 0.01) return '$' + p.toFixed(4); if (p >= 0.0001) return '$' + p.toFixed(6); return '$' + p.toFixed(8); }
   function formatCompact(n) { if (!n) return '--'; const a = Math.abs(n); if (a >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'; if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K'; return '$' + n.toFixed(2); }
@@ -239,12 +238,11 @@
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
     
-    // 核心修复：强制按 rank 升序排序，剔除无排名的干扰项
-    currentPageData = (coins || []).sort((a, b) => {
-      const rankA = a.rank && a.rank > 0 ? a.rank : 999999;
-      const rankB = b.rank && b.rank > 0 ? b.rank : 999999;
-      return rankA - rankB;
-    });
+    // ★ 核心修复：直接过滤掉没有有效排名的资产（如 CMC20 Index）
+    const validCoins = (coins || []).filter(coin => coin.rank && coin.rank > 0);
+    
+    // 强制按 rank 升序排序
+    currentPageData = validCoins.sort((a, b) => a.rank - b.rank);
 
     if (currentPageData.length === 0) { 
       tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">数据获取失败，请刷新重试</td></tr>`; 
@@ -260,12 +258,9 @@
       }
       prevPrices[coin.id] = coin.price;
       
-      // 如果 rank 是 - 或者小于 1，显示特殊样式
-      const rankDisplay = coin.rank && coin.rank > 0 ? coin.rank : '-';
-
       html += `
         <tr onclick="window.openCoinDetail(${coin.id}, '${coin.symbol}')">
-          <td>${rankDisplay}</td>
+          <td>${coin.rank}</td>
           <td><div class="coin-info"><img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png"/><span class="coin-name">${coin.name}</span><span class="coin-symbol">${coin.symbol}</span></div></td>
           <td class="${flashClass}">${formatPrice(coin.price)}</td>
           <td class="${coin.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coin.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coin.percentChange1h)}</td>
@@ -294,7 +289,9 @@
     }
   }
 
-  // 其他卡片渲染与启动
+  // ==========================================
+  // 其他卡片渲染
+  // ==========================================
   async function renderTopCards() {
     try {
       const [globalRes, trendingRes, derivativesRes] = await Promise.all([
