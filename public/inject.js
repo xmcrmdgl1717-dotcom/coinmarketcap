@@ -5,61 +5,74 @@
   
   // 全局内存缓存
   let allCoins = [];
-  let currentPage = 3; // 默认停留在第 3 页，与原版一致
+  let currentPage = 3; // 默认停留在第 3 页
   const PAGE_SIZE = 100;
 
   // ==========================================
-  // 0. 隐藏不需要的头部和底部区域
+  // 0. 暴力隐藏不需要的模块
   // ==========================================
   function hideUnwantedElements() {
+    // 1. 注入全局 CSS 样式
     const style = document.createElement('style');
+    style.id = 'cmc-hide-style';
     style.innerHTML = `
-      /* 隐藏顶部主菜单 (Logo, Markets, Dashboards, 搜索框等) */
-      .rLYzrW_global-header,
-      [data-test="global-header"] {
-        display: none !important;
-      }
+      /* 顶部主导航 (Logo, Markets等) */
+      .rLYzrW_global-header, [data-test="global-header"] { display: none !important; }
       
-      /* 隐藏顶部的二级导航标签 (Top, Trending, Watchlist, Stonks 等) */
-      [data-test="homepage-table-header"] {
-        display: none !important;
-      }
+      /* 顶部二级菜单 (Top, Trending, Watchlist等) */
+      [data-test="homepage-table-header"] { display: none !important; }
       
-      /* 隐藏广告横幅 */
-      .inner-banner {
-        display: none !important;
-      }
+      /* 页面标题 (Today's Cryptocurrency Prices...) */
+      .style__HeaderWrapper-sc-402f0830-1 { display: none !important; }
+      
+      /* 表格上方的卡片区 (Highlights, AI 问答) */
+      .styles__HighlightsContainer-sc-9bffcd02-0, .dKlzxG_wrapper { display: none !important; }
+      
+      /* 底部的 Newsletter 订阅 */
+      [data-test="global-newsletter"], .block-newsletter { display: none !important; }
+      
+      /* 底部 Footer 链接 */
+      [data-test="global-footer"], footer { display: none !important; }
+      
+      /* 底部固定悬浮状态栏 */
+      [data-test="global-bottom-stats-bar"] { display: none !important; }
+      
+      /* Cookie 提示条 */
+      #onetrust-banner-sdk, .cmc-bottom-popup, div[aria-label="Cookie banner"] { display: none !important; }
 
-      /* 隐藏底部的 Newsletter 订阅横幅 */
-      [data-test="global-newsletter"],
-      .block-newsletter {
-        display: none !important;
-      }
+      /* 顶部广告横幅 */
+      .inner-banner { display: none !important; }
       
-      /* 隐藏底部 Footer 链接区 */
-      [data-test="global-footer"],
-      footer {
-        display: none !important;
-      }
-      
-      /* 隐藏底部固定悬浮状态栏 */
-      [data-test="global-bottom-stats-bar"] {
-        display: none !important;
-      }
-
-      /* 隐藏 Cookie 提示条 */
-      #onetrust-banner-sdk,
-      .cmc-bottom-popup,
-      div[aria-label="Cookie banner"] {
-        display: none !important;
-      }
-      
-      /* 调整主体容器的顶部留白，让表格贴顶显示 */
-      .main-content {
-        padding-top: 20px !important;
-      }
+      /* 让主容器顶部贴近页面 */
+      .main-content { padding-top: 20px !important; }
     `;
     document.head.appendChild(style);
+
+    // 2. 直接物理移除 DOM 节点（防止 React 后续重新渲染出来）
+    const selectors = [
+      '.rLYzrW_global-header', '[data-test="global-header"]',
+      '[data-test="homepage-table-header"]',
+      '.style__HeaderWrapper-sc-402f0830-1',
+      '.styles__HighlightsContainer-sc-9bffcd02-0', '.dKlzxG_wrapper',
+      '[data-test="global-newsletter"]', '.block-newsletter',
+      '[data-test="global-footer"]', 'footer',
+      '[data-test="global-bottom-stats-bar"]',
+      '#onetrust-banner-sdk', '.cmc-bottom-popup', '.inner-banner'
+    ];
+
+    const nukeNodes = () => {
+      selectors.forEach(sel => {
+        document.querySelectorAll(sel).forEach(el => {
+          el.style.setProperty('display', 'none', 'important');
+        });
+      });
+    };
+
+    nukeNodes();
+    // React 水合时可能会把节点重新插回来，延迟多次清理
+    setTimeout(nukeNodes, 500);
+    setTimeout(nukeNodes, 1500);
+    setTimeout(nukeNodes, 3000);
   }
 
   // ==========================================
@@ -105,7 +118,6 @@
     const tbody = document.querySelector('tbody');
     if (!tbody) return;
 
-    // 寻找模板行
     const templateRow = tbody.querySelector('tr[style*="cursor:pointer"]') || tbody.querySelector('tr');
     if (!templateRow) return;
 
@@ -239,7 +251,7 @@
         if (newPage && newPage !== currentPage) {
           currentPage = newPage;
           renderTable(currentPage);
-          window.scrollTo({ top: 0, behavior: 'smooth' }); // 翻页后回到顶部
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       });
     });
@@ -251,10 +263,7 @@
   function neutralizeLinks() {
     document.addEventListener('click', function (e) {
       const anchor = e.target.closest('a');
-      // 排除我们自己生成的翻页按钮
       if (anchor && !anchor.hasAttribute('data-page')) {
-        
-        // 检查是否点击的是表格内的币种
         const tr = anchor.closest('tr');
         const coinId = tr ? tr.getAttribute('data-coin-id') : null;
         
@@ -276,9 +285,8 @@
           return;
         }
 
-        // 拦截页面上的其他导航链接，阻止跳转
         const href = anchor.getAttribute('href') || '';
-        if (href.startsWith('/') || href.includes('coinmarketcap.com') || href.includes('dex.coinmarketcap.com')) {
+        if (href.startsWith('/') || href.includes('coinmarketcap.com')) {
           e.preventDefault();
           e.stopPropagation();
         }
@@ -290,17 +298,13 @@
   // 5. 启动应用
   // ==========================================
   async function start() {
-    // 启动时立即隐藏头部和底部
     hideUnwantedElements();
-    
-    // 开启全局点击拦截
     neutralizeLinks();
 
     try {
       const tbody = document.querySelector('tbody');
       if (tbody) tbody.style.opacity = '0.5';
 
-      // 请求全量数据
       const res = await fetch(`${API_BASE}/listing/all`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -308,25 +312,14 @@
       if (Array.isArray(json.data) && json.data.length > 0) {
         allCoins = json.data;
         
-        // 强制按排名升序排列，确保数据展示为 1,2,3...
-        allCoins.sort((a, b) => {
-          const rankA = a.rank || 9999999;
-          const rankB = b.rank || 9999999;
-          return rankA - rankB;
-        });
+        allCoins.sort((a, b) => (a.rank || 9999999) - (b.rank || 9999999));
         
         console.log(`[inject] 成功加载全量数据，共 ${allCoins.length} 个币种`);
         
-        // 解析 URL 中的页码参数（如果有的话）
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = parseInt(urlParams.get('page'), 10);
-        if (pageParam && pageParam > 0) {
-          currentPage = pageParam;
-        } else {
-          currentPage = 3; // 默认展示第 3 页
-        }
+        currentPage = (pageParam && pageParam > 0) ? pageParam : 3;
 
-        // 渲染表格
         renderTable(currentPage);
       }
     } catch (e) {
