@@ -10,40 +10,41 @@ async function fetchWithTimeout(url, headers) {
   }
 }
 
-function authHeaders() {
-  const headers = { Accept: 'application/json' };
-  if (config.cmc.apiKey) headers['X-CMC_PRO_API_KEY'] = config.cmc.apiKey;
-  return headers;
-}
-
-// 1. 行情列表
+// 1. 行情列表（直接调用 Web 端内部接口）
 async function fetchListing({ start, limit }) {
   try {
-    const url = new URL(config.cmc.baseUrl + '/v1/cryptocurrency/listings/latest');
+    const url = new URL('https://api.coinmarketcap.com/data-api/v3/cryptocurrency/listing');
     url.searchParams.set('start', String(start));
     url.searchParams.set('limit', String(limit));
     url.searchParams.set('convert', 'USD');
 
-    const res = await fetchWithTimeout(url, authHeaders());
+    const res = await fetchWithTimeout(url, { Accept: 'application/json' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     
+    // 解析 Web 端的数据结构
+    const list = json.data?.cryptoCurrencyList || [];
     return {
-      data: (json.data || []).map(item => ({
-        id: item.id, rank: item.cmc_rank, name: item.name, symbol: item.symbol,
-        price: item.quote?.USD?.price ?? 0,
-        percentChange1h: item.quote?.USD?.percent_change_1h ?? 0,
-        percentChange24h: item.quote?.USD?.percent_change_24h ?? 0,
-        percentChange7d: item.quote?.USD?.percent_change_7d ?? 0,
-        marketCap: item.quote?.USD?.market_cap ?? 0,
-        volume24h: item.quote?.USD?.volume_24h ?? 0,
-        circulatingSupply: item.circulating_supply ?? 0,
-      })),
-      totalCount: json.status?.total_count ?? 0,
+      data: list.map(item => {
+        const usd = item.quotes?.find(q => q.name === 'USD') || {};
+        return {
+          id: item.id,
+          rank: item.cmcRank,
+          name: item.name,
+          symbol: item.symbol,
+          price: usd.price ?? 0,
+          percentChange1h: usd.percentChange1h ?? 0,
+          percentChange24h: usd.percentChange24h ?? 0,
+          percentChange7d: usd.percentChange7d ?? 0,
+          marketCap: usd.marketCap ?? 0,
+          volume24h: usd.volume24h ?? 0,
+          circulatingSupply: item.circulatingSupply ?? 0,
+        };
+      }),
+      totalCount: json.data?.totalCount ?? 0,
     };
   } catch (err) {
     console.error('[CMC] fetchListing failed:', err.message);
-    // 崩溃保护：返回空数据，防止前端 502
     return { data: [], totalCount: 0 };
   }
 }
@@ -51,9 +52,8 @@ async function fetchListing({ start, limit }) {
 // 2. 全球指标
 async function fetchGlobal() {
   try {
-    const url = new URL(config.cmc.baseUrl + '/v1/global-metrics/quotes/latest');
-    url.searchParams.set('convert', 'USD');
-    const res = await fetchWithTimeout(url, authHeaders());
+    const url = new URL('https://api.coinmarketcap.com/data-api/v3/global-metrics/quotes/latest');
+    const res = await fetchWithTimeout(url, { Accept: 'application/json' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     const usd = json.data?.quote?.USD || {};
@@ -70,8 +70,8 @@ async function fetchGlobal() {
 // 3. 恐慌贪婪指数
 async function fetchFearGreed() {
   try {
-    const url = new URL(config.cmc.baseUrl + '/v3/fear-and-greed/latest');
-    const res = await fetchWithTimeout(url, authHeaders());
+    const url = new URL('https://api.coinmarketcap.com/data-api/v3/fear-and-greed/latest');
+    const res = await fetchWithTimeout(url, { Accept: 'application/json' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     return {
@@ -84,12 +84,12 @@ async function fetchFearGreed() {
   }
 }
 
-// 4. 衍生品与爆仓
+// 4. 衍生品与爆仓 (如果该接口在 Web 端不可用，这里会返回 0，但不会报错崩溃)
 async function fetchDerivatives() {
   try {
-    const url = new URL(config.cmc.baseUrl + '/v5/derivatives/liquidations/quotes/latest');
+    const url = new URL('https://api.coinmarketcap.com/data-api/v3/derivatives/liquidations/quotes/latest');
     url.searchParams.set('convert', 'USD');
-    const res = await fetchWithTimeout(url, authHeaders());
+    const res = await fetchWithTimeout(url, { Accept: 'application/json' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     const data = json.data || {};
@@ -106,7 +106,6 @@ async function fetchDerivatives() {
   }
 }
 
-// 5. 趋势币种
 async function fetchTrending() {
   const result = await fetchListing({ start: 1, limit: 5 });
   return result.data;
