@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Crypto Market Data</title>
     <link rel="icon" href="data:,">
+    <!-- 引入 TradingView 轻量级图表库 -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
             --text-primary: #0d1421; --text-secondary: #616e85; --bg-hover: #f8fafd;
@@ -15,19 +17,13 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafd; color: var(--text-primary); font-size: 14px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* ================= 价格闪烁动画 (CMC同款) ================= */
-        @keyframes flash-up {
-            0% { background-color: rgba(22, 199, 132, 0.3); }
-            100% { background-color: transparent; }
-        }
-        @keyframes flash-down {
-            0% { background-color: rgba(234, 57, 67, 0.3); }
-            100% { background-color: transparent; }
-        }
+        /* ================= 价格闪烁动画 ================= */
+        @keyframes flash-up { 0% { background-color: rgba(22, 199, 132, 0.3); } 100% { background-color: transparent; } }
+        @keyframes flash-down { 0% { background-color: rgba(234, 57, 67, 0.3); } 100% { background-color: transparent; } }
         .price-flash-up { animation: flash-up 1s ease-out; }
         .price-flash-down { animation: flash-down 1s ease-out; }
 
-        /* ================= 右上角悬浮菜单 ================= */
+        /* ================= 悬浮菜单 ================= */
         .floating-controls { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px; }
         .control-btn { width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; border: 1px solid var(--border-color); transition: transform 0.2s; }
         .control-btn:hover { transform: scale(1.05); }
@@ -109,8 +105,10 @@
         .sheet-grid-item { background: var(--bg-inner); padding: 12px; border-radius: 8px; }
         .sheet-grid-item label { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
         .sheet-grid-item span { font-weight: 600; font-size: 15px; }
-        .sheet-chart { background: var(--bg-inner); padding: 16px; border-radius: 12px; text-align: center; }
-        .sheet-chart img { width: 100%; max-width: 300px; height: auto; }
+        
+        /* 图表容器 */
+        .sheet-chart-container { background: #fff; border: 1px solid var(--border-color); padding: 12px; border-radius: 12px; margin-top: 10px; }
+        #detail-chart { width: 100%; height: 250px; }
 
         /* ================= 移动端 ================= */
         .mobile-only { display: none; }
@@ -153,7 +151,6 @@
 <body>
     <!-- 悬浮控制区 -->
     <div class="floating-controls">
-        <!-- 刷新频率控制 -->
         <div style="position: relative;">
             <div class="control-btn" id="refresh-btn" title="自动刷新频率">⏱️</div>
             <div class="dropdown-menu" id="refresh-dropdown">
@@ -165,7 +162,6 @@
                 <div data-time="300000">5M</div>
             </div>
         </div>
-        <!-- 语言切换控制 -->
         <div style="position: relative;">
             <div class="control-btn" id="lang-btn" title="切换语言">🌐</div>
             <div class="dropdown-menu" id="lang-dropdown">
@@ -267,6 +263,7 @@
         </div>
     </div>
 
+    <!-- 抽屉详情 -->
     <div class="bottom-sheet" id="bottom-sheet">
         <div class="sheet-content">
             <div class="sheet-close" id="sheet-close">&times;</div>
@@ -274,7 +271,10 @@
                 <img id="sheet-coin-logo" src="" alt="logo">
                 <div><h2 id="sheet-coin-name">Name</h2><p id="sheet-coin-symbol">SYMBOL</p></div>
             </div>
-            <div class="sheet-price"><h1 id="sheet-coin-price">$0.00</h1><span id="sheet-coin-change" class="text-up">▲ 0.00% (24h)</span></div>
+            <div class="sheet-price">
+                <h1 id="sheet-coin-price">$0.00</h1>
+                <span id="sheet-coin-change" class="text-up">▲ 0.00% (24h)</span>
+            </div>
             <div class="sheet-grid">
                 <div class="sheet-grid-item"><label data-i18n="th_1h">1h %</label><span id="sheet-coin-1h">--</span></div>
                 <div class="sheet-grid-item"><label data-i18n="th_7d">7d %</label><span id="sheet-coin-7d">--</span></div>
@@ -282,9 +282,11 @@
                 <div class="sheet-grid-item"><label data-i18n="th_vol">Volume (24h)</label><span id="sheet-coin-vol">--</span></div>
                 <div class="sheet-grid-item" style="grid-column: span 2;"><label data-i18n="th_supply">Circulating Supply</label><span id="sheet-coin-supply">--</span></div>
             </div>
-            <div class="sheet-chart">
+            
+            <!-- 动态图表容器 -->
+            <div class="sheet-chart-container">
                 <label style="color:var(--text-secondary); font-size:12px; margin-bottom:8px; display:block;" data-i18n="th_chart">7d Price Chart</label>
-                <img id="sheet-coin-chart" src="" alt="chart">
+                <div id="detail-chart"></div>
             </div>
         </div>
     </div>
