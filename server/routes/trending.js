@@ -4,8 +4,8 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const result = await cmc.fetchListing({ start: 1, limit: 5 });
-    res.json({ data: result.data });
+    const trendingList = await cmc.fetchTrending();
+    res.json({ data: trendingList });
   } catch (err) {
     res.status(502).json({ error: 'trending unavailable' });
   }
