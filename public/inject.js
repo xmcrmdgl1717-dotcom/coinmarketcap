@@ -11,7 +11,151 @@
   let trendingTimer = null;
 
   // ==========================================
-  // 1. 格式化工具函数
+  // 1. 多语言字典 (i18n)
+  // ==========================================
+  const i18nData = {
+    'en': {
+      market_status: 'Market Status', market_cap: 'Market Cap', altcoin_season: 'Altcoin Season',
+      etf_flows: 'ETF Flows', trending_coins: 'Trending Coins', derivatives: 'Derivatives',
+      fear_greed: 'Fear & Greed', trending_coin: 'Trending Coin', neutral: 'Neutral',
+      th_rank: '#', th_name: 'Name', th_price: 'Price', th_1h: '1h %', th_24h: '24h %', th_7d: '7d %',
+      th_mcap: 'Market Cap', th_vol: 'Volume(24h)', th_supply: 'Circulating Supply', th_chart: '7d Price%',
+      btn_prev: 'Previous', btn_next: 'Next', loading: 'Loading data...'
+    },
+    'zh-CN': {
+      market_status: '市场概况', market_cap: '总市值', altcoin_season: '山寨季指数',
+      etf_flows: 'ETF 资金流向', trending_coins: '热门币种', derivatives: '衍生品数据',
+      fear_greed: '恐慌与贪婪', trending_coin: '热门币种', neutral: '中性',
+      th_rank: '#', th_name: '名称', th_price: '价格', th_1h: '1小时 %', th_24h: '24小时 %', th_7d: '7天 %',
+      th_mcap: '市值', th_vol: '24h成交量', th_supply: '流通量', th_chart: '7天走势',
+      btn_prev: '上一页', btn_next: '下一页', loading: '正在加载数据...'
+    },
+    'zh-TW': {
+      market_status: '市場概況', market_cap: '總市值', altcoin_season: '山寨季指數',
+      etf_flows: 'ETF 資金流向', trending_coins: '熱門幣種', derivatives: '衍生品數據',
+      fear_greed: '恐慌與貪婪', trending_coin: '熱門幣種', neutral: '中性',
+      th_rank: '#', th_name: '名稱', th_price: '價格', th_1h: '1小時 %', th_24h: '24小時 %', th_7d: '7天 %',
+      th_mcap: '市值', th_vol: '24h成交量', th_supply: '流通量', th_chart: '7天走勢',
+      btn_prev: '上一頁', btn_next: '下一頁', loading: '正在加載數據...'
+    }
+  };
+
+  let currentLang = 'en';
+
+  function applyLanguage(lang) {
+    currentLang = lang;
+    const dict = i18nData[lang] || i18nData['en'];
+    
+    // 替换所有带 data-i18n 属性的元素
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (dict[key]) el.textContent = dict[key];
+    });
+    
+    // 重新渲染表格，让加载中的状态等也切换到对应语言
+    loadPageData(currentPage);
+  }
+
+  async function initLanguage() {
+    // 1. 检查本地存储
+    const savedLang = localStorage.getItem('crypto_lang');
+    if (savedLang && i18nData[savedLang]) {
+      applyLanguage(savedLang);
+      return;
+    }
+
+    // 2. 尝试获取 IP 定位
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500); // 1.5秒超时
+      const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      const data = await res.json();
+      const country = data.country_code;
+      
+      if (country === 'CN') applyLanguage('zh-CN');
+      else if (country === 'HK' || country === 'TW') applyLanguage('zh-TW');
+      else applyLanguage('en');
+      return;
+    } catch (e) {
+      console.log('IP location failed, falling back to device language.');
+    }
+
+    // 3. 如果 IP 失败，使用设备语言
+    const navLang = navigator.language || navigator.userLanguage;
+    if (navLang.includes('zh-CN') || navLang.includes('zh-Hans')) applyLanguage('zh-CN');
+    else if (navLang.includes('zh-TW') || navLang.includes('zh-HK') || navLang.includes('zh-Hant')) applyLanguage('zh-TW');
+    else applyLanguage('en');
+  }
+
+  function setupLangSwitcher() {
+    const btn = document.getElementById('lang-btn');
+    const dropdown = document.getElementById('lang-dropdown');
+    
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('show');
+    });
+    
+    // 点击外部关闭
+    document.addEventListener('click', () => dropdown.classList.remove('show'));
+    
+    // 选择语言
+    dropdown.querySelectorAll('div').forEach(el => {
+      el.addEventListener('click', () => {
+        const lang = el.getAttribute('data-lang');
+        localStorage.setItem('crypto_lang', lang);
+        applyLanguage(lang);
+        dropdown.classList.remove('show');
+      });
+    });
+  }
+
+  // ==========================================
+  // 2. 轮播图逻辑
+  // ==========================================
+  function setupCarousel() {
+    const inner = document.getElementById('carousel-inner');
+    const dotsContainer = document.getElementById('carousel-dots');
+    const items = document.querySelectorAll('.carousel-item');
+    let currentIndex = 0;
+    let carouselTimer = null;
+
+    if (!items.length) return;
+
+    // 生成指示点
+    items.forEach((_, idx) => {
+      const dot = document.createElement('div');
+      dot.className = `carousel-dot ${idx === 0 ? 'active' : ''}`;
+      dot.addEventListener('click', () => goToSlide(idx));
+      dotsContainer.appendChild(dot);
+    });
+
+    const dots = document.querySelectorAll('.carousel-dot');
+
+    function goToSlide(index) {
+      currentIndex = index;
+      inner.style.transform = `translateX(-${currentIndex * 20}%)`; // 5张图，每次移动20%
+      dots.forEach((dot, i) => dot.classList.toggle('active', i === currentIndex));
+    }
+
+    function nextSlide() {
+      currentIndex = (currentIndex + 1) % items.length;
+      goToSlide(currentIndex);
+    }
+
+    // 自动播放
+    carouselTimer = setInterval(nextSlide, 3000);
+
+    // 悬停暂停
+    const carousel = document.getElementById('carousel');
+    carousel.addEventListener('mouseenter', () => clearInterval(carouselTimer));
+    carousel.addEventListener('mouseleave', () => { carouselTimer = setInterval(nextSlide, 3000); });
+  }
+
+  // ==========================================
+  // 3. 格式化工具函数
   // ==========================================
   function formatPrice(p) {
     if (p == null || isNaN(p) || p === 0) return '--';
@@ -44,7 +188,7 @@
   }
 
   // ==========================================
-  // 2. 渲染顶部数据
+  // 4. 渲染顶部数据
   // ==========================================
   async function renderTopCards() {
     try {
@@ -58,20 +202,16 @@
       const trending = trendingRes.ok ? await trendingRes.json() : {};
       const derivatives = derivativesRes.ok ? await derivativesRes.json() : {};
 
-      // 恐慌贪婪指数
       const fg = global.fearGreed || {};
-      // 桌面端
       if (document.getElementById('fg-value-d')) {
         document.getElementById('fg-value-d').textContent = fg.value ?? '--';
         document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
       }
-      // 移动端
       if (document.getElementById('fg-value-m')) {
         document.getElementById('fg-value-m').textContent = fg.value ?? '--';
         document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
       }
       
-      // 总市值
       const mcapStr = formatCompact(global.totalMarketCap);
       const mcapChange = global.marketCapChange24h || 0;
       const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
@@ -81,29 +221,26 @@
       if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
       if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
 
-      // 趋势数据
       trendingData = trending.data || [];
       
-      // 桌面端轮播
       if (trendingData.length > 0 && document.getElementById('trending-list')) {
         renderTrendingPage(0);
         startTrendingRotation();
       }
 
-      // 桌面端衍生品
       if (document.getElementById('derivatives-content')) {
         renderDerivativesCard(derivatives);
       }
 
-      // 移动端：渲染第一名 Trending 币种
       if (trendingData.length > 0 && document.getElementById('mobile-trending-box')) {
         const topCoin = trendingData[0];
         const pct = topCoin.percentChange24h || 0;
         const cls = pct >= 0 ? 'text-up' : 'text-down';
         const arrow = pct >= 0 ? '▲' : '▼';
         
+        // 保留 i18n 的标题
         document.getElementById('mobile-trending-box').innerHTML = `
-            <div class="m-card-title">Trending Coin</div>
+            <div class="m-card-title" data-i18n="trending_coin">Trending Coin</div>
             <div class="coin-info" style="margin-bottom: 4px;">
                 <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${topCoin.id}.png" />
                 <span class="coin-name">${topCoin.symbol}</span>
@@ -111,6 +248,10 @@
             <div class="m-value" style="font-size: 14px;">${formatPrice(topCoin.price)}</div>
             <div class="${cls}" style="font-size: 12px; font-weight: 600;">${arrow} ${formatPercent(pct)}</div>
         `;
+        // 立即应用翻译
+        const dict = i18nData[currentLang] || i18nData['en'];
+        const el = document.getElementById('mobile-trending-box').querySelector('[data-i18n]');
+        if(el) el.textContent = dict['trending_coin'];
       }
 
     } catch (e) {
@@ -119,7 +260,7 @@
   }
 
   // ==========================================
-  // 3. 桌面端 Trending 轮播
+  // 5. Trending & Derivatives
   // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
@@ -165,9 +306,6 @@
     }, 4000);
   }
 
-  // ==========================================
-  // 4. 桌面端 Derivatives 渲染
-  // ==========================================
   function renderDerivativesCard(derivatives) {
     const totalLiq = derivatives.totalLiquidations || 0;
     const longLiq = derivatives.longLiquidations || 0;
@@ -180,6 +318,8 @@
       const color = isRed ? '#ea3943' : '#16c784';
       barsHtml += `<div class="bar" style="height:${height}%; background:${color};"></div>`;
     }
+
+    const dict = i18nData[currentLang] || i18nData['en'];
 
     const derHtml = `
       <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(totalLiq)}</span></div>
@@ -199,7 +339,7 @@
   }
 
   // ==========================================
-  // 5. 底部抽屉交互
+  // 6. 底部抽屉
   // ==========================================
   window.openCoinDetail = function(coinId) {
     const coin = currentPageData.find(c => String(c.id) === String(coinId));
@@ -236,7 +376,7 @@
   }
 
   // ==========================================
-  // 6. 表格渲染
+  // 7. 表格渲染
   // ==========================================
   let currentPageData = [];
 
@@ -246,11 +386,12 @@
     const pageInfo = document.getElementById('page-info');
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
+    const dict = i18nData[currentLang] || i18nData['en'];
 
     currentPageData = coins;
 
     if (!coins || coins.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px;">当前页没有数据或接口请求失败。</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;">${dict.loading}</td></tr>`;
       return;
     }
 
@@ -305,7 +446,8 @@
 
   async function loadPageData(page) {
     const tbody = document.getElementById('crypto-tbody');
-    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#616e85;">正在加载第 ${page} 页数据...</td></tr>`;
+    const dict = i18nData[currentLang] || i18nData['en'];
+    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#616e85;">${dict.loading}</td></tr>`;
 
     try {
       const start = (page - 1) * PAGE_SIZE + 1;
@@ -314,15 +456,22 @@
       const json = await res.json();
       renderTable(json.data);
     } catch (e) {
-      if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">加载失败: ${e.message}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">Failed to load: ${e.message}</td></tr>`;
     }
   }
 
   // ==========================================
-  // 7. 初始化
+  // 8. 初始化
   // ==========================================
   async function init() {
+    setupLangSwitcher();
+    setupCarousel();
     setupBottomSheet();
+    
+    // 1. 先初始化语言，因为加载过程有文本
+    await initLanguage();
+    
+    // 2. 然后渲染数据
     renderTopCards();
     loadPageData(currentPage);
 
