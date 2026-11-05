@@ -61,7 +61,7 @@
         .trend-left { display: flex; align-items: center; gap: 8px; }
         .trend-left img { width: 20px; height: 20px; border-radius: 50%; }
         
-        .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 2px; overflow: hidden;}
+        .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 4px; overflow: hidden;}
         .bar { flex: 1; border-radius: 2px 2px 0 0; }
         
         /* ================= 表格区域 ================= */
@@ -119,9 +119,9 @@
                 </div>
             </div>
 
-            <!-- Trending Coins -->
+            <!-- Trending Coins (加入轮播指示器 ID) -->
             <div class="card">
-                <div class="card-title">Trending Coins <span>1/5 ></span></div>
+                <div class="card-title">Trending Coins <span id="trending-page-indicator">1/5 ></span></div>
                 <div id="trending-list"></div>
             </div>
 
