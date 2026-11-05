@@ -40,9 +40,7 @@
     }
   }
 
-  // ==========================================
   // 字典与初始化
-  // ==========================================
   const i18nData = {
     'en': { market_status: 'Market Status', market_cap: 'Market Cap', altcoin_season: 'Altcoin Season', etf_flows: 'ETF Flows', trending_coins: 'Trending Coins', derivatives: 'Derivatives', fear_greed: 'Fear & Greed', trending_coin: 'Trending Coin', neutral: 'Neutral', th_rank: '#', th_name: 'Name', th_price: 'Price', th_1h: '1h %', th_24h: '24h %', th_7d: '7d %', th_mcap: 'Market Cap', th_vol: 'Volume(24h)', th_supply: 'Circulating Supply', th_chart: '7d Price%', btn_prev: 'Previous', btn_next: 'Next', loading: 'Loading...' },
     'zh-CN': { market_status: '市场概况', market_cap: '总市值', altcoin_season: '山寨季指数', etf_flows: 'ETF 资金流向', trending_coins: '热门币种', derivatives: '衍生品数据', fear_greed: '恐慌与贪婪', trending_coin: '热门币种', neutral: '中性', th_rank: '#', th_name: '名称', th_price: '价格', th_1h: '1小时 %', th_24h: '24小时 %', th_7d: '7天 %', th_mcap: '市值', th_vol: '24h成交量', th_supply: '流通量', th_chart: '7天走势', btn_prev: '上一页', btn_next: '下一页', loading: '正在加载...' },
@@ -134,16 +132,15 @@
       if (detail.klines && detail.klines.length > 0) {
         drawChart(detail.klines);
       } else {
-        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无K线数据 (该交易对可能在交易所不存在)</div>`;
+        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无K线数据</div>`;
       }
 
     } catch (e) {
-      console.warn('[Detail] 接口获取失败，使用列表数据兜底', e);
+      console.warn('[Detail] 接口获取失败，保留原始图表', e);
+      // 如果获取失败，不要把图表搞消失，保留上一次的数据！
       const coinInfo = currentPageData.find(c => String(c.id) === String(coinId));
       if (coinInfo) {
         document.getElementById('sheet-coin-price').textContent = formatPrice(coinInfo.price);
-        document.getElementById('sheet-coin-1h').innerHTML = `<span class="${coinInfo.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange1h)}</span>`;
-        document.getElementById('sheet-coin-7d').innerHTML = `<span class="${coinInfo.percentChange7d >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange7d >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange7d)}</span>`;
         document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
         document.getElementById('sheet-coin-vol').textContent = formatCompact(coinInfo.volume24h);
         document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol}`;
@@ -155,14 +152,13 @@
     const container = document.getElementById('detail-chart');
     if (!container) return;
     const width = container.clientWidth || container.parentElement.clientWidth || 600;
-    const height = 300;
 
     if (container.querySelector('div')) container.innerHTML = '';
 
     if (!chartInstance) {
       chartInstance = LightweightCharts.createChart(container, {
         width: width,
-        height: height,
+        height: 300,
         layout: { backgroundColor: '#ffffff', textColor: '#333' },
         grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
         timeScale: { timeVisible: true, secondsVisible: false },
@@ -181,7 +177,7 @@
   }
 
   // ==========================================
-  // 悬浮菜单与全局刷新
+  // 菜单与全局刷新
   // ==========================================
   function setupFloatingMenus() {
     const langBtn = document.getElementById('lang-btn');
@@ -231,94 +227,7 @@
   }
 
   // ==========================================
-  // 表格与卡片渲染
-  // ==========================================
-  async function renderTopCards() {
-    try {
-      const [globalRes, trendingRes, derivativesRes] = await Promise.all([
-        fetchWithTimeout(`${API_BASE}/global`).catch(() => null),
-        fetchWithTimeout(`${API_BASE}/trending`).catch(() => null),
-        fetchWithTimeout(`${API_BASE}/derivatives`).catch(() => null)
-      ]);
-      
-      const global = globalRes && globalRes.ok ? await globalRes.json() : {};
-      let trending = { data: [] };
-      if (trendingRes && trendingRes.ok) trending = await trendingRes.json();
-      const derivatives = derivativesRes && derivativesRes.ok ? await derivativesRes.json() : {};
-
-      const fg = global.fearGreed || {};
-      if (document.getElementById('fg-value-d')) {
-        document.getElementById('fg-value-d').textContent = fg.value ?? '--';
-        document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
-      }
-      if (document.getElementById('fg-value-m')) {
-        document.getElementById('fg-value-m').textContent = fg.value ?? '--';
-        document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
-      }
-      
-      const mcapStr = formatCompact(global.totalMarketCap || 0);
-      const mcapChange = global.marketCapChange24h || 0;
-      const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
-      const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
-      const mcapHtml = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
-      
-      if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
-      if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
-
-      trendingData = trending.data || [];
-      if (trendingData.length > 0) renderTrendingPage(0);
-      renderDerivativesCard(derivatives);
-
-    } catch (e) {}
-  }
-
-  function renderTrendingPage(pageIndex) {
-    const listEl = document.getElementById('trending-list');
-    if (!listEl || trendingData.length === 0) return;
-    const start = pageIndex * TRENDING_PAGE_SIZE;
-    const pageData = trendingData.slice(start, start + TRENDING_PAGE_SIZE);
-    
-    listEl.innerHTML = pageData.map((coin, i) => {
-      const pct = coin.percentChange24h || 0;
-      const cls = pct >= 0 ? 'text-up' : 'text-down';
-      return `
-        <div class="trend-row">
-          <div class="trend-left">
-            <span style="color:var(--text-secondary); width:12px;">${start + i + 1}</span>
-            <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" onerror="this.style.display='none'"/>
-            <span>${coin.symbol}</span>
-          </div>
-          <div>
-            <span style="font-weight:600;">${formatPrice(coin.price)}</span>
-            <span class="${cls}" style="margin-left:8px;font-size:12px;">${pct >= 0 ? '▲' : '▼'} ${formatPercent(pct)}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    const pageIndicator = document.getElementById('trending-page-indicator');
-    if (pageIndicator) {
-      const totalPages = Math.ceil(trendingData.length / TRENDING_PAGE_SIZE);
-      pageIndicator.textContent = `${pageIndex + 1}/${totalPages} >`;
-    }
-  }
-
-  function renderDerivativesCard(derivatives) {
-    const totalLiq = derivatives.totalLiquidations || 0;
-    let barsHtml = '';
-    for (let i = 0; i < 12; i++) {
-      barsHtml += `<div class="bar" style="height:${Math.floor(Math.random() * 60) + 30}%; background:${Math.random() > 0.4 ? '#ea3943' : '#16c784'};"></div>`;
-    }
-    document.getElementById('derivatives-content').innerHTML = `
-      <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(totalLiq)}</span></div>
-      <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(derivatives.longLiquidations || 0)}</span></div>
-      <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(derivatives.shortLiquidations || 0)}</span></div>
-      <div class="mini-chart">${barsHtml}</div>
-    `;
-  }
-
-  // ==========================================
-  // 表格渲染
+  // 表格渲染核心逻辑（加了强制排序）
   // ==========================================
   function formatPrice(p) { if (!p) return '--'; if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (p >= 0.01) return '$' + p.toFixed(4); if (p >= 0.0001) return '$' + p.toFixed(6); return '$' + p.toFixed(8); }
   function formatCompact(n) { if (!n) return '--'; const a = Math.abs(n); if (a >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'; if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K'; return '$' + n.toFixed(2); }
@@ -329,14 +238,21 @@
   function renderTable(coins, isSilent) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
-    currentPageData = coins || [];
-    if (!coins || coins.length === 0) { 
+    
+    // 核心修复：强制按 rank 升序排序，剔除无排名的干扰项
+    currentPageData = (coins || []).sort((a, b) => {
+      const rankA = a.rank && a.rank > 0 ? a.rank : 999999;
+      const rankB = b.rank && b.rank > 0 ? b.rank : 999999;
+      return rankA - rankB;
+    });
+
+    if (currentPageData.length === 0) { 
       tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">数据获取失败，请刷新重试</td></tr>`; 
       return; 
     }
 
     let html = '';
-    coins.forEach(coin => {
+    currentPageData.forEach(coin => {
       let flashClass = '';
       if (isSilent && prevPrices[coin.id] !== undefined) {
         if (coin.price > prevPrices[coin.id]) flashClass = 'price-flash-up';
@@ -344,9 +260,12 @@
       }
       prevPrices[coin.id] = coin.price;
       
+      // 如果 rank 是 - 或者小于 1，显示特殊样式
+      const rankDisplay = coin.rank && coin.rank > 0 ? coin.rank : '-';
+
       html += `
         <tr onclick="window.openCoinDetail(${coin.id}, '${coin.symbol}')">
-          <td>${coin.rank || '-'}</td>
+          <td>${rankDisplay}</td>
           <td><div class="coin-info"><img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png"/><span class="coin-name">${coin.name}</span><span class="coin-symbol">${coin.symbol}</span></div></td>
           <td class="${flashClass}">${formatPrice(coin.price)}</td>
           <td class="${coin.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coin.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coin.percentChange1h)}</td>
@@ -375,9 +294,69 @@
     }
   }
 
-  // ==========================================
-  // 启动
-  // ==========================================
+  // 其他卡片渲染与启动
+  async function renderTopCards() {
+    try {
+      const [globalRes, trendingRes, derivativesRes] = await Promise.all([
+        fetchWithTimeout(`${API_BASE}/global`).catch(() => null),
+        fetchWithTimeout(`${API_BASE}/trending`).catch(() => null),
+        fetchWithTimeout(`${API_BASE}/derivatives`).catch(() => null)
+      ]);
+      
+      const global = globalRes && globalRes.ok ? await globalRes.json() : {};
+      let trending = { data: [] };
+      if (trendingRes && trendingRes.ok) trending = await trendingRes.json();
+      const derivatives = derivativesRes && derivativesRes.ok ? await derivativesRes.json() : {};
+
+      const fg = global.fearGreed || {};
+      if (document.getElementById('fg-value-d')) document.getElementById('fg-value-d').textContent = fg.value ?? '--';
+      if (document.getElementById('fg-value-m')) document.getElementById('fg-value-m').textContent = fg.value ?? '--';
+      
+      const mcapHtml = `${formatCompact(global.totalMarketCap || 0)} <span class="${global.marketCapChange24h >= 0 ? 'text-up' : 'text-down'}">${global.marketCapChange24h >= 0 ? '▲' : '▼'} ${formatPercent(global.marketCapChange24h)}</span>`;
+      if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
+      if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
+
+      trendingData = trending.data || [];
+      if (trendingData.length > 0) renderTrendingPage(0);
+      renderDerivativesCard(derivatives);
+    } catch (e) {}
+  }
+
+  function renderTrendingPage(pageIndex) {
+    const listEl = document.getElementById('trending-list');
+    if (!listEl || trendingData.length === 0) return;
+    const start = pageIndex * TRENDING_PAGE_SIZE;
+    const pageData = trendingData.slice(start, start + TRENDING_PAGE_SIZE);
+    listEl.innerHTML = pageData.map((coin, i) => `
+      <div class="trend-row">
+        <div class="trend-left">
+          <span style="color:var(--text-secondary); width:12px;">${start + i + 1}</span>
+          <img src="https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png" onerror="this.style.display='none'"/>
+          <span>${coin.symbol}</span>
+        </div>
+        <div>
+          <span style="font-weight:600;">${formatPrice(coin.price)}</span>
+          <span class="${coin.percentChange24h >= 0 ? 'text-up' : 'text-down'}" style="margin-left:8px;font-size:12px;">${coin.percentChange24h >= 0 ? '▲' : '▼'} ${formatPercent(coin.percentChange24h)}</span>
+        </div>
+      </div>
+    `).join('');
+    const pageIndicator = document.getElementById('trending-page-indicator');
+    if (pageIndicator) pageIndicator.textContent = `${pageIndex + 1}/${Math.ceil(trendingData.length / TRENDING_PAGE_SIZE)} >`;
+  }
+
+  function renderDerivativesCard(derivatives) {
+    let barsHtml = '';
+    for (let i = 0; i < 12; i++) {
+      barsHtml += `<div class="bar" style="height:${Math.floor(Math.random() * 60) + 30}%; background:${Math.random() > 0.4 ? '#ea3943' : '#16c784'};"></div>`;
+    }
+    document.getElementById('derivatives-content').innerHTML = `
+      <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(derivatives.totalLiquidations || 0)}</span></div>
+      <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(derivatives.longLiquidations || 0)}</span></div>
+      <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(derivatives.shortLiquidations || 0)}</span></div>
+      <div class="mini-chart">${barsHtml}</div>
+    `;
+  }
+
   async function init() {
     setupFloatingMenus();
     await initLanguage(); 
