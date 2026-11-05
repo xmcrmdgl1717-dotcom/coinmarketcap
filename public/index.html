@@ -25,7 +25,7 @@
         }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* ================= 顶部卡片 ================= */
+        /* ================= 桌面端顶部卡片 (保持原样) ================= */
         .top-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
         .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
         .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -78,34 +78,17 @@
         button:disabled { color: #ccc; cursor: not-allowed; border-color: var(--border-color); }
 
         /* ================= 底部抽屉 (Bottom Sheet) ================= */
-        .bottom-sheet {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg-overlay); z-index: 1000;
-            visibility: hidden; opacity: 0; transition: all 0.3s ease;
-        }
+        .bottom-sheet { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-overlay); z-index: 1000; visibility: hidden; opacity: 0; transition: all 0.3s ease; }
         .bottom-sheet.show { visibility: visible; opacity: 1; }
-        .sheet-content {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            background: #fff; border-radius: 20px 20px 0 0;
-            padding: 24px 20px; box-sizing: border-box;
-            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1);
-            max-height: 85vh; overflow-y: auto;
-        }
+        .sheet-content { position: absolute; bottom: 0; left: 0; width: 100%; background: #fff; border-radius: 20px 20px 0 0; padding: 24px 20px; box-sizing: border-box; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1); max-height: 85vh; overflow-y: auto; }
         .bottom-sheet.show .sheet-content { transform: translateY(0); }
-        .sheet-close {
-            position: absolute; top: 16px; right: 16px;
-            font-size: 24px; color: var(--text-secondary); cursor: pointer;
-            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
-            background: var(--bg-inner); border-radius: 50%;
-        }
+        .sheet-close { position: absolute; top: 16px; right: 16px; font-size: 24px; color: var(--text-secondary); cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-inner); border-radius: 50%; }
         .sheet-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .sheet-header img { width: 40px; height: 40px; border-radius: 50%; }
         .sheet-header h2 { margin: 0; font-size: 20px; }
         .sheet-header p { margin: 2px 0 0 0; color: var(--text-secondary); font-size: 14px; }
-        
         .sheet-price { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
         .sheet-price h1 { margin: 0; font-size: 32px; font-weight: 700; }
-        
         .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
         .sheet-grid-item { background: var(--bg-inner); padding: 12px; border-radius: 8px; }
         .sheet-grid-item label { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
@@ -113,45 +96,59 @@
         .sheet-chart { background: var(--bg-inner); padding: 16px; border-radius: 12px; text-align: center; }
         .sheet-chart img { width: 100%; max-width: 300px; height: auto; }
 
-        /* ================= 移动端响应式 ================= */
+        /* ================= 移动端 UI ================= */
+        .mobile-only { display: none; }
+        
         @media (max-width: 768px) {
             .container { padding: 10px; }
-            
-            /* 顶部卡片横向滑动 */
-            .top-cards { 
-                display: flex; 
-                overflow-x: auto; 
-                scroll-snap-type: x mandatory; 
-                gap: 12px; 
-                padding-bottom: 10px;
-                -webkit-overflow-scrolling: touch;
-                margin-bottom: 16px;
-            }
-            .top-cards::-webkit-scrollbar { display: none; } /* 隐藏滚动条 */
-            .card { 
-                flex: 0 0 88%; /* 卡片宽度占屏幕88%，露出下一个边缘 */
-                scroll-snap-align: start; 
-            }
+            .desktop-only { display: none !important; }
+            .mobile-only { display: block; }
 
-            /* 表格：隐藏次要列，只留 Rank, Name, Price, 24h% */
+            /* 极简聚合卡片 */
+            .mobile-card {
+                background: var(--bg-card); border-radius: 12px; padding: 16px;
+                box-shadow: var(--shadow); border: 1px solid var(--border-color);
+                margin-bottom: 16px;
+                display: flex; flex-direction: column;
+            }
+            .mobile-card-top { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
+            
+            /* 仪表盘缩小版 */
+            .mobile-gauge-wrap { flex: 0 0 100px; display: flex; flex-direction: column; align-items: center; }
+            .mobile-gauge { width: 90px; height: 45px; border-top-left-radius: 90px; border-top-right-radius: 90px; background: conic-gradient(from 270deg at 50% 100%, #ea3943 0%, #f3d42f 40%, #16c784 80%, transparent 80%); position: relative; display: flex; justify-content: center; align-items: flex-end; }
+            .mobile-gauge::after { content: ''; position: absolute; width: 70px; height: 35px; background: var(--bg-card); bottom: 0; left: 10px; border-top-left-radius: 70px; border-top-right-radius: 70px; }
+            .mobile-gauge-val { position: relative; z-index: 1; font-weight: 700; font-size: 16px; margin-bottom: 2px; }
+            .mobile-gauge-lbl { font-size: 10px; background: #f0b90b; color: #fff; padding: 2px 8px; border-radius: 10px; margin-top: 4px; font-weight: 600; }
+
+            /* 右侧数据 */
+            .mobile-stats { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+            .mobile-stat-box { background: var(--bg-inner); padding: 10px; border-radius: 8px; }
+            
+            /* 底部进度条 */
+            .mobile-card-bottom { display: flex; gap: 12px; }
+            .mobile-card-bottom .box { flex: 1; background: var(--bg-inner); padding: 10px; border-radius: 8px; }
+
+            /* 表格移动端适配 */
+            table { table-layout: fixed; width: 100%; }
+            /* 隐藏次要列 */
             th:nth-child(4), td:nth-child(4),
             th:nth-child(6), td:nth-child(6),
             th:nth-child(7), td:nth-child(7),
             th:nth-child(8), td:nth-child(8),
             th:nth-child(9), td:nth-child(9),
-            th:nth-child(10), td:nth-child(10) { 
-                display: none; 
-            }
-            th:nth-child(5), td:nth-child(5) {
-                text-align: right;
-                padding-right: 16px;
-            }
+            th:nth-child(10), td:nth-child(10) { display: none; }
             
-            /* 移动端表格触摸优化 */
-            td { padding: 16px 8px; }
+            /* 分配列宽，防止 Price 溢出 */
+            th:nth-child(1), td:nth-child(1) { width: 8%; padding: 16px 4px; }
+            th:nth-child(2), td:nth-child(2) { width: 45%; padding: 16px 4px; }
+            th:nth-child(3), td:nth-child(3) { width: 25%; padding: 16px 4px; text-align: right; }
+            th:nth-child(5), td:nth-child(5) { width: 22%; padding: 16px 4px; text-align: right; }
+            
             .coin-info img { width: 28px; height: 28px; }
-            
-            /* 移动端翻页按钮居中 */
+            .coin-name { font-size: 15px; }
+            .coin-symbol { display: none; } /* 移动端名称太长，隐藏符号，保留整体整洁 */
+
+            /* 翻页居中 */
             .pagination { justify-content: center; gap: 20px; }
             button { padding: 12px 20px; flex: 1; }
         }
@@ -159,19 +156,19 @@
 </head>
 <body>
     <div class="container">
-        <!-- 顶部横向滑动区域 -->
-        <div class="top-cards">
+        <!-- 桌面端顶部卡片 -->
+        <div class="top-cards desktop-only">
             <div class="card">
                 <div class="card-title">Market Status <span>查看全部 ></span></div>
                 <div class="ms-grid">
                     <div class="ms-left">
                         <div class="gauge"></div>
-                        <div class="gauge-value" id="fg-value">--</div>
-                        <div class="gauge-label" id="fg-label">Neutral</div>
+                        <div class="gauge-value" id="fg-value-d">--</div>
+                        <div class="gauge-label" id="fg-label-d">Neutral</div>
                     </div>
                     <div class="ms-right">
                         <div class="inner-card">
-                            <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value" id="global-mcap">--</span></div>
+                            <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value" id="global-mcap-d">--</span></div>
                         </div>
                         <div class="inner-card">
                             <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
@@ -205,6 +202,40 @@
             </div>
         </div>
 
+        <!-- 移动端极简聚合卡片 -->
+        <div class="mobile-only mobile-card">
+            <div class="mobile-card-top">
+                <div class="mobile-gauge-wrap">
+                    <div class="mobile-gauge"></div>
+                    <div class="mobile-gauge-val" id="fg-value-m">--</div>
+                    <div class="mobile-gauge-lbl" id="fg-label-m">Neutral</div>
+                </div>
+                <div class="mobile-stats">
+                    <div class="mobile-stat-box">
+                        <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value" id="global-mcap-m">--</span></div>
+                    </div>
+                    <div class="mobile-stat-box">
+                        <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="mobile-card-bottom">
+                <div class="box">
+                    <div class="stat-row"><span class="stat-label">Altcoin Season</span><span class="stat-value">48</span></div>
+                    <div class="progress-bar">
+                        <div class="progress-seg" style="width:25%; background:#f0b90b;"></div>
+                        <div class="progress-seg" style="width:25%; background:#cfd6e4;"></div>
+                        <div class="progress-seg" style="width:25%; background:#3b82f6;"></div>
+                        <div class="progress-seg" style="width:25%; background:#16c784;"></div>
+                    </div>
+                </div>
+                <div class="box">
+                    <div class="stat-row"><span class="stat-label">ETF Flows</span><span class="stat-value text-up">+ $148.10M</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 表格 -->
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -234,7 +265,7 @@
         </div>
     </div>
 
-    <!-- 底部抽屉 (Bottom Sheet) -->
+    <!-- 底部抽屉 -->
     <div class="bottom-sheet" id="bottom-sheet">
         <div class="sheet-content">
             <div class="sheet-close" id="sheet-close">&times;</div>
@@ -245,42 +276,23 @@
                     <p id="sheet-coin-symbol">SYMBOL</p>
                 </div>
             </div>
-            
             <div class="sheet-price">
                 <h1 id="sheet-coin-price">$0.00</h1>
                 <span id="sheet-coin-change" class="text-up">▲ 0.00% (24h)</span>
             </div>
-
             <div class="sheet-grid">
-                <div class="sheet-grid-item">
-                    <label>1h %</label>
-                    <span id="sheet-coin-1h">--</span>
-                </div>
-                <div class="sheet-grid-item">
-                    <label>7d %</label>
-                    <span id="sheet-coin-7d">--</span>
-                </div>
-                <div class="sheet-grid-item">
-                    <label>Market Cap</label>
-                    <span id="sheet-coin-mcap">--</span>
-                </div>
-                <div class="sheet-grid-item">
-                    <label>Volume (24h)</label>
-                    <span id="sheet-coin-vol">--</span>
-                </div>
-                <div class="sheet-grid-item" style="grid-column: span 2;">
-                    <label>Circulating Supply</label>
-                    <span id="sheet-coin-supply">--</span>
-                </div>
+                <div class="sheet-grid-item"><label>1h %</label><span id="sheet-coin-1h">--</span></div>
+                <div class="sheet-grid-item"><label>7d %</label><span id="sheet-coin-7d">--</span></div>
+                <div class="sheet-grid-item"><label>Market Cap</label><span id="sheet-coin-mcap">--</span></div>
+                <div class="sheet-grid-item"><label>Volume (24h)</label><span id="sheet-coin-vol">--</span></div>
+                <div class="sheet-grid-item" style="grid-column: span 2;"><label>Circulating Supply</label><span id="sheet-coin-supply">--</span></div>
             </div>
-
             <div class="sheet-chart">
                 <label style="color:var(--text-secondary); font-size:12px; margin-bottom:8px; display:block;">7d Price Chart</label>
                 <img id="sheet-coin-chart" src="" alt="chart">
             </div>
         </div>
     </div>
-
     <script src="/inject.js"></script>
 </body>
 </html>
