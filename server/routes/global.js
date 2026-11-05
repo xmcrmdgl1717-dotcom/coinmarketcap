@@ -1,9 +1,6 @@
 const express = require('express');
 const cache = require('../utils/cache');
-const { dedupe } = require('../utils/inflight');
-const config = require('../config');
 const cmc = require('../providers/cmc');
-
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -12,19 +9,16 @@ router.get('/', async (req, res) => {
   if (cached) return res.json({ ...cached, cached: true });
 
   try {
-    const result = await dedupe(key, async () => {
-      const [globalData, fearGreed] = await Promise.all([
-        cmc.fetchGlobal(),
-        cmc.fetchFearGreed(),
-      ]);
-      const r = { ...globalData, fearGreed };
-      cache.set(key, r, config.cache.global);
-      return r;
-    });
-    return res.json({ ...result, cached: false });
+    const [globalData, fearGreed] = await Promise.all([
+      cmc.fetchGlobal(),
+      cmc.fetchFearGreed(),
+    ]);
+    const result = { ...globalData, fearGreed };
+    cache.set(key, result, 60 * 1000); // 缓存 1 分钟
+    return res.json(result);
   } catch (err) {
+    console.error('[global] failed:', err.message);
     return res.status(502).json({ error: 'global metrics unavailable' });
   }
 });
-
 module.exports = router;
