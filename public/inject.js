@@ -29,7 +29,7 @@
   let prevDetailVol = null;
 
   // ==========================================
-  // 1. 多语言字典
+  // 1. 多语言字典 (略)
   // ==========================================
   const i18nData = {
     'en': { market_status: 'Market Status', market_cap: 'Market Cap', altcoin_season: 'Altcoin Season', etf_flows: 'ETF Flows', trending_coins: 'Trending Coins', derivatives: 'Derivatives', fear_greed: 'Fear & Greed', trending_coin: 'Trending Coin', neutral: 'Neutral', th_rank: '#', th_name: 'Name', th_price: 'Price', th_1h: '1h %', th_24h: '24h %', th_7d: '7d %', th_mcap: 'Market Cap', th_vol: 'Volume(24h)', th_supply: 'Circulating Supply', th_chart: '7d Price%', btn_prev: 'Previous', btn_next: 'Next', loading: 'Loading...' },
@@ -61,7 +61,7 @@
   }
 
   // ==========================================
-  // 2. 悬浮菜单控制
+  // 2. 悬浮菜单与全局刷新频率
   // ==========================================
   function setupFloatingMenus() {
     const langBtn = document.getElementById('lang-btn');
@@ -95,19 +95,26 @@
     document.addEventListener('click', closeAll);
   }
 
+  // 设置全局刷新频率，同时也覆盖内页刷新
   function setupRefreshTimer(interval = 5000) {
     if (refreshTimer) clearInterval(refreshTimer);
+    if (detailTimer) clearInterval(detailTimer); // 清除旧的详情定时器
+
     refreshInterval = interval;
     
     if (interval > 0) {
+      // 首页刷新
       refreshTimer = setInterval(() => {
         renderTopCards();
         loadPageData(currentPage, true);
-        // 如果内页开着，同时刷新内页
-        if (currentDetailSymbol) {
-          fetchDetailData(currentDetailId, currentDetailSymbol);
-        }
       }, interval);
+
+      // 如果内页开着，用同一套频率刷新内页
+      if (currentDetailSymbol) {
+        detailTimer = setInterval(() => {
+          fetchDetailData(currentDetailId, currentDetailSymbol);
+        }, interval);
+      }
     }
   }
 
@@ -121,13 +128,9 @@
       ]);
       const global = globalRes.ok ? await globalRes.json() : {};
       
-      // 处理 trending 兜底：如果接口挂了，用当前列表前 5 名
       let trending = { data: [] };
-      if (trendingRes.ok) {
-        trending = await trendingRes.json();
-      } else if (currentPageData.length > 0) {
-        trending = { data: currentPageData.slice(0, 10) };
-      }
+      if (trendingRes.ok) trending = await trendingRes.json();
+      else if (currentPageData.length > 0) trending = { data: currentPageData.slice(0, 10) };
 
       const derivatives = derivativesRes.ok ? await derivativesRes.json() : {};
 
@@ -195,7 +198,6 @@
       ];
       
       const gradients = ['linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)', 'linear-gradient(135deg, #1A2980 0%, #26D0CE 100%)', 'linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)'];
-      
       const inner = document.getElementById('carousel-inner');
       const dotsContainer = document.getElementById('carousel-dots');
 
@@ -212,7 +214,6 @@
           goToSlide(parseInt(e.target.getAttribute('data-index')));
         });
       });
-
       startAutoPlay();
     }).catch(e => console.log('轮播加载失败:', e));
   }
@@ -235,7 +236,7 @@
   }
 
   // ==========================================
-  // 5. 渲染热门币 & 衍生品 (增加强兜底)
+  // 5. 渲染热门币 & 衍生品
   // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
@@ -284,7 +285,6 @@
     const longLiq = derivatives.longLiquidations || 239554405;
     const shortLiq = derivatives.shortLiquidations || 422502052;
     
-    // 如果没有真实数据，用随机柱子模拟
     let barsHtml = '';
     for (let i = 0; i < 12; i++) {
       const isRed = Math.random() > 0.4;
@@ -305,7 +305,7 @@
   }
 
   // ==========================================
-  // 6. 内页实时刷新与图表渲染
+  // 6. 内页实时刷新与图表渲染 (重点修复)
   // ==========================================
   window.openCoinDetail = function(coinId, symbol) {
     const sheet = document.getElementById('bottom-sheet');
@@ -316,16 +316,16 @@
     prevDetailPrice = null;
     prevDetailVol = null;
     
-    // 初始化 UI 状态
+    // 初始化 UI
     document.getElementById('sheet-coin-logo').src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coinId}.png`;
-    document.getElementById('sheet-coin-name').textContent = symbol; // 先用 symbol 占位
+    document.getElementById('sheet-coin-name').textContent = symbol;
     document.getElementById('sheet-coin-symbol').textContent = symbol;
     document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">加载图表中...</div>';
     
-    // 初次拉取
+    // 立即拉取一次
     fetchDetailData(coinId, symbol);
 
-    // 启动内页专属刷新定时器
+    // 启动内页定时器（使用全局的 refreshInterval）
     if (detailTimer) clearInterval(detailTimer);
     detailTimer = setInterval(() => {
       fetchDetailData(coinId, symbol);
@@ -338,17 +338,22 @@
       if (!res.ok) throw new Error('API Err');
       const detail = await res.json();
 
-      // 1. 更新基础数据并触发闪烁
+      // 1. 价格闪烁 (背景闪烁)
       const priceEl = document.getElementById('sheet-coin-price');
       const newPrice = detail.price;
       
+      // 移除旧动画
+      priceEl.classList.remove('price-flash-up', 'price-flash-down');
+      
       if (prevDetailPrice !== null && newPrice !== prevDetailPrice) {
-        priceEl.className = newPrice > prevDetailPrice ? 'price-flash-up' : 'price-flash-down';
-        setTimeout(() => priceEl.className = '', 1000); // 1秒后移除动画
+        // 强制触发重绘
+        void priceEl.offsetWidth; 
+        priceEl.classList.add(newPrice > prevDetailPrice ? 'price-flash-up' : 'price-flash-down');
       }
       priceEl.textContent = formatPrice(newPrice);
       prevDetailPrice = newPrice;
 
+      // 2. 基础数据更新
       const pct24 = detail.pct24h || 0;
       const changeEl = document.getElementById('sheet-coin-change');
       changeEl.className = pct24 >= 0 ? 'text-up' : 'text-down';
@@ -359,28 +364,36 @@
       document.getElementById('sheet-coin-1h').innerHTML = `<span class="${p1 >= 0 ? 'text-up' : 'text-down'}">${p1 >= 0 ? '▲' : '▼'} ${formatPercent(p1)}</span>`;
       document.getElementById('sheet-coin-7d').innerHTML = `<span class="${p7 >= 0 ? 'text-up' : 'text-down'}">${p7 >= 0 ? '▲' : '▼'} ${formatPercent(p7)}</span>`;
       
-      // 成交量也加闪烁
+      // 3. 成交量闪烁
       const volEl = document.getElementById('sheet-coin-vol');
+      volEl.classList.remove('price-flash-up', 'price-flash-down');
       if (prevDetailVol !== null && detail.vol24h !== prevDetailVol) {
-        volEl.style.color = detail.vol24h > prevDetailVol ? 'var(--up-color)' : 'var(--down-color)';
-        setTimeout(() => volEl.style.color = 'inherit', 1000);
+        void volEl.offsetWidth;
+        volEl.classList.add(detail.vol24h > prevDetailVol ? 'price-flash-up' : 'price-flash-down');
       }
       volEl.textContent = formatCompact(detail.vol24h || 0);
       prevDetailVol = detail.vol24h;
 
+      // 市值和流通量 (用列表缓存的)
       const coin = currentPageData.find(c => String(c.id) === String(coinId));
       if (coin) {
         document.getElementById('sheet-coin-mcap').textContent = formatCompact(coin.marketCap);
         document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coin.circulatingSupply)} ${coin.symbol}`;
       }
 
-      // 2. 绘制/更新图表 (增量更新防止闪烁)
+      // 4. 绘制/更新图表
       if (detail.klines && detail.klines.length > 0) {
+        const chartContainer = document.getElementById('detail-chart');
+        
+        // 如果容器里有 loading 文本，清空它
+        if (chartContainer.querySelector('div')) {
+           chartContainer.innerHTML = '';
+        }
+
         if (!chartInstance) {
-          document.getElementById('detail-chart').innerHTML = '';
-          chartInstance = LightweightCharts.createChart(document.getElementById('detail-chart'), {
-            width: document.getElementById('detail-chart').clientWidth,
-            height: 250,
+          chartInstance = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: 300,
             layout: { backgroundColor: '#ffffff', textColor: '#333' },
             grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
             timeScale: { timeVisible: true, secondsVisible: false },
@@ -393,7 +406,7 @@
           candleSeries.setData(detail.klines);
           chartInstance.timeScale().fitContent();
         } else {
-          // 如果图表已存在，只更新最后一条数据，极其丝滑
+          // 增量更新，不闪烁重绘
           const lastCandle = detail.klines[detail.klines.length - 1];
           candleSeries.update(lastCandle);
         }
@@ -401,7 +414,7 @@
 
     } catch (e) {
       console.warn('内页数据加载失败:', e);
-      // 兜底：用表格列表里的静态数据
+      // 兜底
       const coin = currentPageData.find(c => String(c.id) === String(coinId));
       if (coin && !chartInstance) {
         document.getElementById('sheet-coin-price').textContent = formatPrice(coin.price);
@@ -424,6 +437,14 @@
     document.getElementById('sheet-close').addEventListener('click', close);
     sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
   }
+
+  // 窗口大小改变时调整图表
+  window.addEventListener('resize', () => {
+    if (chartInstance) {
+      const container = document.getElementById('detail-chart');
+      chartInstance.applyOptions({ width: container.clientWidth });
+    }
+  });
 
   // ==========================================
   // 7. 表格渲染与工具函数
