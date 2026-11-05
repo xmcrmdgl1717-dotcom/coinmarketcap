@@ -3,89 +3,77 @@
 
   const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
   
-  // 全局内存缓存
   let allCoins = [];
-  let currentPage = 3; // 默认停留在第 3 页
+  let currentPage = 3; 
   const PAGE_SIZE = 100;
 
   // ==========================================
-  // 0. 暴力清除一切不需要的模块 (只留表格)
+  // 0. 终极物理删除（把不需要的 HTML 直接抠掉）
   // ==========================================
-  function hideUnwantedElements() {
-    // 1. 注入全局 CSS
-    const style = document.createElement('style');
-    style.id = 'cmc-clean-style';
-    style.innerHTML = `
-      /* 目标：干掉所有非表格区域 */
-      [data-test="global-header"],
-      [data-test="homepage-table-header"],
-      .style__HeaderWrapper-sc-402f0830-1,
-      [data-test="homepage-highlights"],
-      [data-test="homepage-ai-insights"],
-      [data-test="table-control"],
-      [data-test="global-newsletter"],
-      [data-test="global-footer"],
-      footer,
-      [data-test="global-bottom-stats-bar"],
-      #onetrust-banner-sdk,
-      .inner-banner,
-      .cmc-bottom-popup {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        height: 0 !important;
-        overflow: hidden !important;
-      }
-      
-      /* 调整表格容器，让表格紧贴顶部 */
-      .style__HomepageContainer-sc-402f0830-2 { padding-top: 0 !important; }
-      .main-content { padding-top: 10px !important; }
-    `;
-    document.head.appendChild(style);
+  function forceRemoveElements() {
+    // 1. 在 head 注入最高优先级的 CSS（防止页面打开瞬间闪烁）
+    if (!document.getElementById('cmc-force-css')) {
+      const style = document.createElement('style');
+      style.id = 'cmc-force-css';
+      style.innerHTML = `
+        /* 顶部的 4 个大卡片 (Market Status, Trending Coins 等) */
+        .leaRTT { display: none !important; }
+        
+        /* 中间的 AI 标签 (Topic, Try Agentic Charts 等) */
+        [data-test="homepage-ai-insights"], .jsdkmm { display: none !important; }
+        
+        /* 表格上方的工具栏 (All Networks, Filters, Columns 等) */
+        [data-test="table-control"] { display: none !important; }
+        
+        /* 顶部导航和二级菜单 */
+        .rLYzrW_global-header, [data-test="global-header"] { display: none !important; }
+        [data-test="homepage-table-header"] { display: none !important; }
+        
+        /* 标题和底部所有东西 */
+        .style__HeaderWrapper-sc-402f0830-1 { display: none !important; }
+        [data-test="global-newsletter"], [data-test="global-footer"], 
+        [data-test="global-bottom-stats-bar"], footer, .inner-banner { display: none !important; }
+        
+        /* 页面贴顶 */
+        .main-content { padding-top: 10px !important; }
+        .style__HomepageContainer-sc-402f0830-2 { padding-top: 0 !important; }
+      `;
+      document.head.appendChild(style);
+    }
 
-    // 2. 物理隐藏节点
+    // 2. 物理删除 DOM 节点
     const selectors = [
-      '[data-test="global-header"]',
+      '.leaRTT', 
+      '[data-test="homepage-ai-insights"]', 
+      '.jsdkmm', 
+      '[data-test="table-control"]',
+      '.rLYzrW_global-header',
       '[data-test="homepage-table-header"]',
       '.style__HeaderWrapper-sc-402f0830-1',
-      '[data-test="homepage-highlights"]', 
-      '[data-test="homepage-ai-insights"]', 
-      '[data-test="table-control"]', 
       '[data-test="global-newsletter"]',
-      '[data-test="global-footer"]', 
-      'footer',
+      '[data-test="global-footer"]',
       '[data-test="global-bottom-stats-bar"]',
-      '#onetrust-banner-sdk', 
+      'footer',
       '.inner-banner'
     ];
 
-    const nukeNodes = () => {
-      selectors.forEach(sel => {
-        document.querySelectorAll(sel).forEach(el => {
-          el.style.setProperty('display', 'none', 'important');
-        });
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        // 直接从 DOM 树中移除
+        el.remove(); 
       });
-    };
-
-    nukeNodes();
-
-    // 3. 终极绝杀：监听 DOM 变化，React 敢渲染，我们就敢删
-    const observer = new MutationObserver((mutations) => {
-      let shouldNuke = false;
-      for (let mutation of mutations) {
-        if (mutation.addedNodes.length > 0) {
-          shouldNuke = true;
-          break;
-        }
-      }
-      if (shouldNuke) nukeNodes();
     });
+  }
 
-    observer.observe(document.body, { childList: true, subtree: true });
+  // 3. 启动“守卫”，只要 React 敢偷偷重建，就立刻秒杀
+  function startGuard() {
+    forceRemoveElements();
+    // 轮询清理，因为 React 可能会在几百毫秒后重绘
+    setInterval(forceRemoveElements, 200); 
   }
 
   // ==========================================
-  // 1. 格式化工具函数
+  // 1. 格式化工具
   // ==========================================
   function formatPrice(price) {
     if (price == null || isNaN(price)) return '--';
@@ -94,7 +82,6 @@
     if (price >= 0.0001) return '$' + price.toFixed(6);
     return '$' + price.toFixed(8);
   }
-
   function formatCompact(num) {
     if (num == null || isNaN(num)) return '--';
     const abs = Math.abs(num);
@@ -104,7 +91,6 @@
     if (abs >= 1e3) return '$' + (num / 1e3).toFixed(2) + 'K';
     return '$' + num.toFixed(2);
   }
-
   function formatSupply(num) {
     if (num == null || isNaN(num)) return '--';
     const abs = Math.abs(num);
@@ -114,19 +100,17 @@
     if (abs >= 1e3) return (num / 1e3).toFixed(2) + 'K';
     return String(num);
   }
-
   function formatPercent(pct) {
     if (pct == null || isNaN(pct)) return '--';
     return Math.abs(pct).toFixed(2) + '%';
   }
 
   // ==========================================
-  // 2. 表格渲染引擎
+  // 2. 渲染表格
   // ==========================================
   function renderTable(page) {
     const tbody = document.querySelector('tbody');
     if (!tbody) return;
-
     const templateRow = tbody.querySelector('tr[style*="cursor:pointer"]') || tbody.querySelector('tr');
     if (!templateRow) return;
 
@@ -137,23 +121,18 @@
     tbody.innerHTML = '';
     skeletonRows.forEach(tr => tbody.appendChild(tr));
 
-    pageData.forEach((coin, idx) => {
+    pageData.forEach((coin) => {
       const tr = templateRow.cloneNode(true);
       tr.setAttribute('data-coin-id', String(coin.id));
       
-      // 1. 排名
       const rankP = tr.querySelectorAll('td')[1].querySelector('p');
       if (rankP) rankP.textContent = coin.rank;
 
-      // 2. 名称与图标
       const link = tr.querySelectorAll('td')[2].querySelector('a');
       if (link) {
         link.href = 'javascript:void(0);';
         const img = link.querySelector('img.coin-logo');
-        if (img) {
-          img.src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`;
-          img.alt = `${coin.name} logo`;
-        }
+        if (img) img.src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`;
         const nameP = link.querySelector('.coin-item-name');
         if (nameP) nameP.textContent = coin.name;
         const symbolP = link.querySelector('.coin-item-symbol');
@@ -162,11 +141,9 @@
 
       const tds = tr.querySelectorAll('td');
       
-      // 3. 价格
       const priceContainer = tds[3].querySelector('[class*="Price__PriceTransition"]');
       if (priceContainer) priceContainer.textContent = formatPrice(coin.price);
 
-      // 4. 涨跌幅
       [coin.percentChange1h, coin.percentChange24h, coin.percentChange7d].forEach((pct, i) => {
         const cell = tds[4 + i];
         const wrapper = cell.querySelector('span[class*="PercentageView"]');
@@ -177,7 +154,6 @@
         }
       });
 
-      // 5. 市值 & 成交量
       const spans8 = tds[7].querySelectorAll('span');
       for (let i = spans8.length - 1; i >= 0; i--) {
         if (spans8[i].children.length === 0) { spans8[i].textContent = formatCompact(coin.marketCap); break; }
@@ -187,16 +163,11 @@
         if (spans9[i].children.length === 0) { spans9[i].textContent = formatCompact(coin.volume24h); break; }
       }
 
-      // 6. 流通量
       const supplyVal = tds[9].querySelector('.circulating-supply-value span');
       if (supplyVal) supplyVal.textContent = formatSupply(coin.circulatingSupply);
 
-      // 7. 走势图
       const sparklineImg = tds[11].querySelector('img');
-      if (sparklineImg) {
-        sparklineImg.src = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
-        sparklineImg.alt = `${coin.symbol.toLowerCase()}-7d-price-graph`;
-      }
+      if (sparklineImg) sparklineImg.src = `https://s3.coinmarketcap.com/generated/sparklines/web/7d/2781/${coin.id}.svg`;
 
       tbody.appendChild(tr);
     });
@@ -205,7 +176,7 @@
   }
 
   // ==========================================
-  // 3. 接管分页 UI
+  // 3. 接管分页
   // ==========================================
   function updatePaginationUI(page) {
     const totalPages = Math.ceil(allCoins.length / PAGE_SIZE);
@@ -213,11 +184,8 @@
     if (!paginationUl) return;
 
     let html = '';
-    if (page > 1) {
-      html += `<li class="previous"><a href="#" data-page="${page - 1}" class="chevron">&#10094;</a></li>`;
-    } else {
-      html += `<li class="previous disabled"><span class="chevron">&#10094;</span></li>`;
-    }
+    if (page > 1) html += `<li class="previous"><a href="#" data-page="${page - 1}" class="chevron">&#10094;</a></li>`;
+    else html += `<li class="previous disabled"><span class="chevron">&#10094;</span></li>`;
 
     let startP = Math.max(1, page - 2);
     let endP = Math.min(totalPages, page + 2);
@@ -226,21 +194,15 @@
     if (startP > 2) html += `<li class="break">...</li>`;
 
     for (let i = startP; i <= endP; i++) {
-      if (i === page) {
-        html += `<li class="page active"><a href="#" aria-current="page">${i}</a></li>`;
-      } else {
-        html += `<li class="page"><a href="#" data-page="${i}">${i}</a></li>`;
-      }
+      if (i === page) html += `<li class="page active"><a href="#" aria-current="page">${i}</a></li>`;
+      else html += `<li class="page"><a href="#" data-page="${i}">${i}</a></li>`;
     }
 
     if (endP < totalPages - 1) html += `<li class="break">...</li>`;
     if (endP < totalPages) html += `<li class="page"><a href="#" data-page="${totalPages}">${totalPages}</a></li>`;
 
-    if (page < totalPages) {
-      html += `<li class="next"><a href="#" data-page="${page + 1}" class="chevron">&#10095;</a></li>`;
-    } else {
-      html += `<li class="next disabled"><span class="chevron">&#10095;</span></li>`;
-    }
+    if (page < totalPages) html += `<li class="next"><a href="#" data-page="${page + 1}" class="chevron">&#10095;</a></li>`;
+    else html += `<li class="next disabled"><span class="chevron">&#10095;</span></li>`;
 
     paginationUl.innerHTML = html;
 
@@ -255,18 +217,15 @@
       a.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const newPage = parseInt(a.getAttribute('data-page'), 10);
-        if (newPage && newPage !== currentPage) {
-          currentPage = newPage;
-          renderTable(currentPage);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        currentPage = parseInt(a.getAttribute('data-page'), 10);
+        renderTable(currentPage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   }
 
   // ==========================================
-  // 4. 全局链接拦截（点击展示数据）
+  // 4. 拦截点击
   // ==========================================
   function neutralizeLinks() {
     document.addEventListener('click', function (e) {
@@ -274,25 +233,15 @@
       if (anchor && !anchor.hasAttribute('data-page')) {
         const tr = anchor.closest('tr');
         const coinId = tr ? tr.getAttribute('data-coin-id') : null;
-        
         if (coinId) {
           e.preventDefault();
           e.stopPropagation();
           const coinData = allCoins.find(c => String(c.id) === String(coinId));
           if (coinData) {
-            alert(
-              `【币种详细数据展示】\n\n` +
-              `名称: ${coinData.name} (${coinData.symbol})\n` +
-              `当前排名: #${coinData.rank}\n` +
-              `实时价格: ${formatPrice(coinData.price)}\n` +
-              `市值: ${formatCompact(coinData.marketCap)}\n` +
-              `24h成交量: ${formatCompact(coinData.volume24h)}\n` +
-              `流通量: ${formatSupply(coinData.circulatingSupply)}`
-            );
+            alert(`【币种详情】\n名称: ${coinData.name} (${coinData.symbol})\n排名: #${coinData.rank}\n价格: ${formatPrice(coinData.price)}\n市值: ${formatCompact(coinData.marketCap)}`);
           }
           return;
         }
-
         const href = anchor.getAttribute('href') || '';
         if (href.startsWith('/') || href.includes('coinmarketcap.com')) {
           e.preventDefault();
@@ -303,10 +252,10 @@
   }
 
   // ==========================================
-  // 5. 启动应用
+  // 5. 启动
   // ==========================================
   async function start() {
-    hideUnwantedElements();
+    startGuard(); // 启动物理删除守卫
     neutralizeLinks();
 
     try {
@@ -314,15 +263,10 @@
       if (tbody) tbody.style.opacity = '0.5';
 
       const res = await fetch(`${API_BASE}/listing/all`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       
       if (Array.isArray(json.data) && json.data.length > 0) {
-        allCoins = json.data;
-        
-        allCoins.sort((a, b) => (a.rank || 9999999) - (b.rank || 9999999));
-        
-        console.log(`[inject] 成功加载全量数据，共 ${allCoins.length} 个币种`);
+        allCoins = json.data.sort((a, b) => (a.rank || 9999999) - (b.rank || 9999999));
         
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = parseInt(urlParams.get('page'), 10);
@@ -333,8 +277,7 @@
     } catch (e) {
       console.error('[inject] 数据加载失败:', e.message);
     } finally {
-      const tbody = document.querySelector('tbody');
-      if (tbody) tbody.style.opacity = '1';
+      if (document.querySelector('tbody')) document.querySelector('tbody').style.opacity = '1';
     }
   }
 
