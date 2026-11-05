@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  // ⚠️ 注意检查这里：确保你的 Render 后端地址完全正确，且没有多余的斜杠
+  // 请确认这里的地址与你部署的后端地址完全一致
   const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
   
   let allCoins = [];
@@ -54,7 +54,6 @@
 
     let html = '';
     pageData.forEach(coin => {
-      // 兼容不同 API 可能返回的字段名
       const rank = coin.rank || coin.cmcRank || '-';
       const name = coin.name || 'Unknown';
       const symbol = coin.symbol || '?';
@@ -103,34 +102,35 @@
     if(btnNext) btnNext.disabled = currentPage >= totalPages;
   }
 
-  // 初始化并填充 Trending Coins 卡片
+  // 初始化
   async function init() {
     const tbody = document.getElementById('crypto-tbody');
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 50px; color: #616e85;">正在连接服务器 (Render 免费版首次访问可能需要等待 30-50 秒唤醒)...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding: 50px; color: #616e85;">正在连接服务器 (若页面长时间无响应，说明 Render 后端正在冷启动，通常需要等待 30-50 秒)...</td></tr>';
     }
 
     try {
-      console.log("[Debug] 发起请求:", `${API_BASE}/listing/all`);
-      
-      const res = await fetch(`${API_BASE}/listing/all`);
-      if (!res.ok) throw new Error(`HTTP 状态码错误: ${res.status}`);
+      // 加入 60 秒超时设置（应对 Render 冷启动）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const res = await fetch(`${API_BASE}/listing/all`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
       
       const json = await res.json();
-      console.log("[Debug] 收到的 JSON:", json);
-
-      // 兼容多种可能的 JSON 结构
+      
       let rawList = [];
       if (Array.isArray(json)) rawList = json;
       else if (json.data && Array.isArray(json.data)) rawList = json.data;
       else if (json.data && json.data.listing && json.data.listing.cryptoCurrencyList) rawList = json.data.listing.cryptoCurrencyList;
       
       if (rawList.length > 0) {
-        // 强转并排序
         allCoins = rawList.sort((a, b) => {
-          const rankA = a.rank || a.cmcRank || 9999999;
-          const rankB = b.rank || b.cmcRank || 9999999;
-          return rankA - rankB;
+          const rA = a.rank || a.cmcRank || 9999999;
+          const rB = b.rank || b.cmcRank || 9999999;
+          return rA - rB;
         });
         
         const urlParams = new URLSearchParams(window.location.search);
@@ -178,21 +178,21 @@
         });
 
       } else {
-        throw new Error("API 返回成功，但未找到币种数据。返回格式为: " + JSON.stringify(json).substring(0, 100));
+        throw new Error("API 返回成功，但未找到数据。");
       }
     } catch (e) {
       console.error('Data load failed:', e);
-      // 把错误直接显示在页面上，方便排查
       if (tbody) {
+        // 如果是超时或网络错误，给出明确提示
+        let errorMsg = e.message;
+        if (e.name === 'AbortError') errorMsg = "请求超时（超过60秒）。Render 免费后端休眠后唤醒太慢，请刷新页面重试。";
+        
         tbody.innerHTML = `
           <tr>
             <td colspan="10" style="text-align:center; padding: 50px; color: #ea3943;">
               <strong>数据加载失败</strong><br><br>
-              错误原因: ${e.message}<br>
-              请检查：<br>
-              1. 你的 Render 后端服务是否处于唤醒状态（刷新页面重试）。<br>
-              2. 后端是否配置了 CORS 允许跨域 (Access-Control-Allow-Origin: *)。<br>
-              3. 接口路径是否正确 (${API_BASE}/listing/all)。
+              错误原因: ${errorMsg}<br>
+              请检查后端是否已成功部署，且配置了 CORS 跨域。
             </td>
           </tr>
         `;
@@ -200,7 +200,6 @@
     }
   }
 
-  // 等页面元素渲染完成后执行
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
