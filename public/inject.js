@@ -40,7 +40,7 @@
     }
   }
 
-  // 字典与初始化
+  // 字典
   const i18nData = {
     'en': { market_status: 'Market Status', market_cap: 'Market Cap', altcoin_season: 'Altcoin Season', etf_flows: 'ETF Flows', trending_coins: 'Trending Coins', derivatives: 'Derivatives', fear_greed: 'Fear & Greed', trending_coin: 'Trending Coin', neutral: 'Neutral', th_rank: '#', th_name: 'Name', th_price: 'Price', th_1h: '1h %', th_24h: '24h %', th_7d: '7d %', th_mcap: 'Market Cap', th_vol: 'Volume(24h)', th_supply: 'Circulating Supply', th_chart: '7d Price%', btn_prev: 'Previous', btn_next: 'Next', loading: 'Loading...' },
     'zh-CN': { market_status: '市场概况', market_cap: '总市值', altcoin_season: '山寨季指数', etf_flows: 'ETF 资金流向', trending_coins: '热门币种', derivatives: '衍生品数据', fear_greed: '恐慌与贪婪', trending_coin: '热门币种', neutral: '中性', th_rank: '#', th_name: '名称', th_price: '价格', th_1h: '1小时 %', th_24h: '24小时 %', th_7d: '7天 %', th_mcap: '市值', th_vol: '24h成交量', th_supply: '流通量', th_chart: '7天走势', btn_prev: '上一页', btn_next: '下一页', loading: '正在加载...' },
@@ -68,7 +68,7 @@
   }
 
   // ==========================================
-  // 内页图表核心
+  // 核心修复：内页图表生命周期与防闪烁
   // ==========================================
   window.openCoinDetail = function(coinId, symbol) {
     const sheet = document.getElementById('bottom-sheet');
@@ -82,16 +82,19 @@
     document.getElementById('sheet-coin-name').textContent = symbol;
     document.getElementById('sheet-coin-symbol').textContent = symbol;
     
-    setTimeout(() => {
-      if (chartInstance) {
+    // 1. 清理旧图表实例
+    if (chartInstance) {
         chartInstance.remove();
         chartInstance = null;
         candleSeries = null;
-      }
-      document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">图表数据加载中...</div>';
-    }, 10);
+    }
+    // 2. 显示 Loading
+    document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">图表加载中...</div>';
 
-    fetchDetailData(coinId, symbol);
+    // 3. 延迟 350ms 等抽屉滑出后再拉数据画图（解决宽度为0的问题）
+    setTimeout(() => {
+        fetchDetailData(coinId, symbol);
+    }, 350);
 
     if (detailTimer) clearInterval(detailTimer);
     detailTimer = setInterval(() => { fetchDetailData(coinId, symbol); }, refreshInterval);
@@ -105,6 +108,7 @@
 
       const coinInfo = currentPageData.find(c => String(c.id) === String(coinId)) || {};
 
+      // 更新文字数据及闪烁
       const priceEl = document.getElementById('sheet-coin-price');
       const newPrice = detail.price;
       if (prevDetailPrice !== null && newPrice !== prevDetailPrice) {
@@ -115,65 +119,56 @@
       priceEl.textContent = formatPrice(newPrice);
       prevDetailPrice = newPrice;
 
-      const p24 = detail.pct24h || coinInfo.percentChange24h || 0;
-      const changeEl = document.getElementById('sheet-coin-change');
-      changeEl.className = p24 >= 0 ? 'text-up' : 'text-down';
-      changeEl.textContent = `${p24 >= 0 ? '▲' : '▼'} ${formatPercent(p24)} (24h)`;
-
+      document.getElementById('sheet-coin-change').textContent = `${(detail.pct24h || 0) >= 0 ? '▲' : '▼'} ${formatPercent(detail.pct24h)} (24h)`;
       document.getElementById('sheet-coin-1h').innerHTML = `<span class="${coinInfo.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange1h)}</span>`;
-      
-      const p7 = detail.pct7d || coinInfo.percentChange7d || 0;
-      document.getElementById('sheet-coin-7d').innerHTML = `<span class="${p7 >= 0 ? 'text-up' : 'text-down'}">${p7 >= 0 ? '▲' : '▼'} ${formatPercent(p7)}</span>`;
+      document.getElementById('sheet-coin-7d').innerHTML = `<span class="${(detail.pct7d || 0) >= 0 ? 'text-up' : 'text-down'}">${(detail.pct7d || 0) >= 0 ? '▲' : '▼'} ${formatPercent(detail.pct7d)}</span>`;
       
       document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
       document.getElementById('sheet-coin-vol').textContent = formatCompact(detail.vol24h || coinInfo.volume24h);
       document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol || symbol}`;
 
-      if (detail.klines && detail.klines.length > 0) {
-        drawChart(detail.klines);
+      // 核心修复：如果没有 K 线数据，直接 return，千万不要去动图表 DOM
+      if (!detail.klines || detail.klines.length === 0) return;
+
+      // 画图
+      const container = document.getElementById('detail-chart');
+      // 如果容器里有 loading 字样，先清空（只清一次）
+      if (container.querySelector('div')) {
+          container.innerHTML = ''; 
+      }
+
+      if (!chartInstance) {
+        // 第一次创建
+        chartInstance = LightweightCharts.createChart(container, {
+          width: container.clientWidth || 600,
+          height: 300,
+          layout: { backgroundColor: '#ffffff', textColor: '#333' },
+          grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
+          timeScale: { timeVisible: true, secondsVisible: false },
+        });
+        candleSeries = chartInstance.addCandlestickSeries({
+          upColor: '#16c784', downColor: '#ea3943', borderVisible: false,
+          wickUpColor: '#16c784', wickDownColor: '#ea3943',
+        });
+        candleSeries.setData(detail.klines);
+        chartInstance.timeScale().fitContent();
       } else {
-        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无K线数据</div>`;
+        // 后续刷新，只更新最新的一根 K 线，实现丝滑跳动
+        candleSeries.update(detail.klines[detail.klines.length - 1]);
       }
 
     } catch (e) {
-      console.warn('[Detail] 接口获取失败，保留原始图表', e);
-      const coinInfo = currentPageData.find(c => String(c.id) === String(coinId));
-      if (coinInfo) {
-        document.getElementById('sheet-coin-price').textContent = formatPrice(coinInfo.price);
-        document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
-        document.getElementById('sheet-coin-vol').textContent = formatCompact(coinInfo.volume24h);
-        document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol}`;
-      }
+      console.warn('[Detail] 接口异常，保留现有图表', e);
+      // 捕获异常，但不做任何 DOM 删除操作
     }
   }
 
-  function drawChart(klines) {
-    const container = document.getElementById('detail-chart');
-    if (!container) return;
-    const width = container.clientWidth || container.parentElement.clientWidth || 600;
-
-    if (container.querySelector('div')) container.innerHTML = '';
-
-    if (!chartInstance) {
-      chartInstance = LightweightCharts.createChart(container, {
-        width: width,
-        height: 300,
-        layout: { backgroundColor: '#ffffff', textColor: '#333' },
-        grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
-        timeScale: { timeVisible: true, secondsVisible: false },
-      });
-      
-      candleSeries = chartInstance.addCandlestickSeries({
-        upColor: '#16c784', downColor: '#ea3943', borderVisible: false,
-        wickUpColor: '#16c784', wickDownColor: '#ea3943',
-      });
-      
-      candleSeries.setData(klines);
-      chartInstance.timeScale().fitContent();
-    } else {
-      candleSeries.update(klines[klines.length - 1]);
+  // 监听窗口大小变化
+  window.addEventListener('resize', () => {
+    if (chartInstance && document.getElementById('detail-chart')) {
+      chartInstance.applyOptions({ width: document.getElementById('detail-chart').clientWidth });
     }
-  }
+  });
 
   // ==========================================
   // 菜单与全局刷新
@@ -226,7 +221,7 @@
   }
 
   // ==========================================
-  // 表格渲染核心逻辑（加了过滤，干掉无排名资产）
+  // 表格渲染核心（干掉无排名资产）
   // ==========================================
   function formatPrice(p) { if (!p) return '--'; if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (p >= 0.01) return '$' + p.toFixed(4); if (p >= 0.0001) return '$' + p.toFixed(6); return '$' + p.toFixed(8); }
   function formatCompact(n) { if (!n) return '--'; const a = Math.abs(n); if (a >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'; if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K'; return '$' + n.toFixed(2); }
@@ -238,10 +233,7 @@
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
     
-    // ★ 核心修复：直接过滤掉没有有效排名的资产（如 CMC20 Index）
     const validCoins = (coins || []).filter(coin => coin.rank && coin.rank > 0);
-    
-    // 强制按 rank 升序排序
     currentPageData = validCoins.sort((a, b) => a.rank - b.rank);
 
     if (currentPageData.length === 0) { 
@@ -289,9 +281,7 @@
     }
   }
 
-  // ==========================================
-  // 其他卡片渲染
-  // ==========================================
+  // 其他卡片
   async function renderTopCards() {
     try {
       const [globalRes, trendingRes, derivativesRes] = await Promise.all([
@@ -299,7 +289,6 @@
         fetchWithTimeout(`${API_BASE}/trending`).catch(() => null),
         fetchWithTimeout(`${API_BASE}/derivatives`).catch(() => null)
       ]);
-      
       const global = globalRes && globalRes.ok ? await globalRes.json() : {};
       let trending = { data: [] };
       if (trendingRes && trendingRes.ok) trending = await trendingRes.json();
