@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Crypto Market Data</title>
     <link rel="icon" href="data:,">
-    <!-- 引入 TradingView 轻量级图表库 -->
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         :root {
@@ -17,13 +16,13 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafd; color: var(--text-primary); font-size: 14px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* ================= 价格闪烁动画 ================= */
-        @keyframes flash-up { 0% { background-color: rgba(22, 199, 132, 0.3); } 100% { background-color: transparent; } }
-        @keyframes flash-down { 0% { background-color: rgba(234, 57, 67, 0.3); } 100% { background-color: transparent; } }
+        /* 闪烁动画 */
+        @keyframes flash-up { 0% { color: var(--up-color); } 100% { color: inherit; } }
+        @keyframes flash-down { 0% { color: var(--down-color); } 100% { color: inherit; } }
         .price-flash-up { animation: flash-up 1s ease-out; }
         .price-flash-down { animation: flash-down 1s ease-out; }
 
-        /* ================= 悬浮菜单 ================= */
+        /* 悬浮菜单 */
         .floating-controls { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px; }
         .control-btn { width: 40px; height: 40px; border-radius: 50%; background: #fff; box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; border: 1px solid var(--border-color); transition: transform 0.2s; }
         .control-btn:hover { transform: scale(1.05); }
@@ -33,19 +32,19 @@
         .dropdown-menu div:hover { background: var(--bg-hover); }
         .dropdown-menu div.active { color: var(--up-color); font-weight: 600; background: #f0fdf9; }
 
-        /* ================= 轮播图 ================= */
+        /* 轮播图 (修复宽度挤压问题) */
         .banner-carousel { position: relative; width: 100%; aspect-ratio: 3/1; border-radius: 16px; overflow: hidden; margin-bottom: 24px; box-shadow: var(--shadow); background: #000; }
-        .carousel-inner { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
-        .carousel-item { flex-shrink: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px; box-sizing: border-box; }
-        .carousel-item h2 { font-size: 24px; margin: 0 0 10px 0; font-weight: 700; line-height: 1.3; }
-        .carousel-item p { font-size: 14px; margin: 0; opacity: 0.9; line-height: 1.4; }
+        .carousel-inner { display: flex; transition: transform 0.5s ease-in-out; height: 100%; width: 100%; }
+        .carousel-item { flex-shrink: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px; box-sizing: border-box; }
+        .carousel-item h2 { font-size: 24px; margin: 0 0 10px 0; font-weight: 700; line-height: 1.3; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .carousel-item p { font-size: 14px; margin: 0; opacity: 0.9; line-height: 1.4; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .carousel-indicators { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
         .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); cursor: pointer; transition: all 0.3s; }
         .carousel-dot.active { background: #fff; width: 16px; border-radius: 4px; }
 
-        /* ================= 桌面端卡片 ================= */
+        /* 桌面端卡片 */
         .top-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
-        .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); min-height: 200px; }
         .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
         .card-title span { color: var(--text-secondary); font-weight: 400; font-size: 13px; cursor: pointer; }
         .ms-grid { display: flex; gap: 12px; margin-bottom: 12px; }
@@ -71,7 +70,7 @@
         .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 4px; overflow: hidden;}
         .bar { flex: 1; border-radius: 2px 2px 0 0; }
 
-        /* ================= 表格 ================= */
+        /* 表格 */
         .table-wrapper { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border-color); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: right; }
         th { color: var(--text-secondary); font-weight: 500; font-size: 12px; padding: 16px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; background: #fff; }
@@ -89,7 +88,7 @@
         button { padding: 10px 16px; border: 1px solid #cfd6e4; background: #fff; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-primary); }
         button:disabled { color: #ccc; cursor: not-allowed; border-color: var(--border-color); }
 
-        /* ================= 底部抽屉 ================= */
+        /* 底部抽屉 */
         .bottom-sheet { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-overlay); z-index: 1000; visibility: hidden; opacity: 0; transition: all 0.3s ease; }
         .bottom-sheet.show { visibility: visible; opacity: 1; }
         .sheet-content { position: absolute; bottom: 0; left: 0; width: 100%; background: #fff; border-radius: 20px 20px 0 0; padding: 24px 20px; box-sizing: border-box; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1); max-height: 85vh; overflow-y: auto; }
@@ -100,17 +99,16 @@
         .sheet-header h2 { margin: 0; font-size: 20px; }
         .sheet-header p { margin: 2px 0 0 0; color: var(--text-secondary); font-size: 14px; }
         .sheet-price { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
-        .sheet-price h1 { margin: 0; font-size: 32px; font-weight: 700; }
+        .sheet-price h1 { margin: 0; font-size: 32px; font-weight: 700; transition: color 0.3s; }
         .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
         .sheet-grid-item { background: var(--bg-inner); padding: 12px; border-radius: 8px; }
         .sheet-grid-item label { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
         .sheet-grid-item span { font-weight: 600; font-size: 15px; }
         
-        /* 图表容器 */
         .sheet-chart-container { background: #fff; border: 1px solid var(--border-color); padding: 12px; border-radius: 12px; margin-top: 10px; }
         #detail-chart { width: 100%; height: 250px; }
 
-        /* ================= 移动端 ================= */
+        /* 移动端 */
         .mobile-only { display: none; }
         @media (max-width: 768px) {
             .container { padding: 10px; }
@@ -149,7 +147,6 @@
     </style>
 </head>
 <body>
-    <!-- 悬浮控制区 -->
     <div class="floating-controls">
         <div style="position: relative;">
             <div class="control-btn" id="refresh-btn" title="自动刷新频率">⏱️</div>
@@ -184,11 +181,11 @@
                 <div class="ms-grid">
                     <div class="ms-left">
                         <div class="gauge"></div>
-                        <div class="gauge-value" id="fg-value-d">--</div>
+                        <div class="gauge-value" id="fg-value-d">50</div>
                         <div class="gauge-label" id="fg-label-d" data-i18n="neutral">Neutral</div>
                     </div>
                     <div class="ms-right">
-                        <div class="inner-card"><div class="stat-row"><span class="stat-label" data-i18n="market_cap">Market Cap</span><span class="stat-value" id="global-mcap-d">--</span></div></div>
+                        <div class="inner-card"><div class="stat-row"><span class="stat-label" data-i18n="market_cap">Market Cap</span><span class="stat-value" id="global-mcap-d">$2.5T</span></div></div>
                         <div class="inner-card"><div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div></div>
                     </div>
                 </div>
@@ -214,11 +211,11 @@
             <div class="m-card">
                 <div class="m-card-title" data-i18n="fear_greed">Fear & Greed</div>
                 <div class="mobile-gauge"></div>
-                <div class="mobile-gauge-val" id="fg-value-m">--</div>
+                <div class="mobile-gauge-val" id="fg-value-m">50</div>
                 <div class="mobile-gauge-lbl" id="fg-label-m" data-i18n="neutral">Neutral</div>
             </div>
             <div class="m-card" style="justify-content: space-around;">
-                <div><div class="m-card-title" data-i18n="market_cap">Market Cap</div><div class="m-value" id="global-mcap-m">--</div></div>
+                <div><div class="m-card-title" data-i18n="market_cap">Market Cap</div><div class="m-value" id="global-mcap-m">$2.5T</div></div>
                 <div><div class="m-card-title">CMC20</div><div class="m-value">$163.14 <span class="text-up" style="font-size:12px; font-weight:500;">▲ 1.77%</span></div></div>
             </div>
             <div class="m-card" style="justify-content: space-around;">
@@ -263,7 +260,6 @@
         </div>
     </div>
 
-    <!-- 抽屉详情 -->
     <div class="bottom-sheet" id="bottom-sheet">
         <div class="sheet-content">
             <div class="sheet-close" id="sheet-close">&times;</div>
@@ -279,11 +275,10 @@
                 <div class="sheet-grid-item"><label data-i18n="th_1h">1h %</label><span id="sheet-coin-1h">--</span></div>
                 <div class="sheet-grid-item"><label data-i18n="th_7d">7d %</label><span id="sheet-coin-7d">--</span></div>
                 <div class="sheet-grid-item"><label data-i18n="th_mcap">Market Cap</label><span id="sheet-coin-mcap">--</span></div>
-                <div class="sheet-grid-item"><label data-i18n="th_vol">Volume (24h)</label><span id="sheet-coin-vol">--</span></div>
+                <div class="sheet-grid-item"><label data-i18n="th_vol">Volume (24h)</label><span id="sheet-coin-vol" style="transition: color 0.3s;">--</span></div>
                 <div class="sheet-grid-item" style="grid-column: span 2;"><label data-i18n="th_supply">Circulating Supply</label><span id="sheet-coin-supply">--</span></div>
             </div>
             
-            <!-- 动态图表容器 -->
             <div class="sheet-chart-container">
                 <label style="color:var(--text-secondary); font-size:12px; margin-bottom:8px; display:block;" data-i18n="th_chart">7d Price Chart</label>
                 <div id="detail-chart"></div>
