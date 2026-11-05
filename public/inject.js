@@ -25,9 +25,8 @@
   let currentDetailId = null;
   let currentDetailSymbol = null;
   let prevDetailPrice = null;
-  let prevDetailVol = null;
 
-  // 通用 Fetch 超时封装（8秒超时，防止服务器网络卡死）
+  // 封装 fetch 带超时
   async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 8000 } = options;
     const controller = new AbortController();
@@ -43,7 +42,7 @@
   }
 
   // ==========================================
-  // 1. 多语言字典
+  // 字典与初始化
   // ==========================================
   const i18nData = {
     'en': { market_status: 'Market Status', market_cap: 'Market Cap', altcoin_season: 'Altcoin Season', etf_flows: 'ETF Flows', trending_coins: 'Trending Coins', derivatives: 'Derivatives', fear_greed: 'Fear & Greed', trending_coin: 'Trending Coin', neutral: 'Neutral', th_rank: '#', th_name: 'Name', th_price: 'Price', th_1h: '1h %', th_24h: '24h %', th_7d: '7d %', th_mcap: 'Market Cap', th_vol: 'Volume(24h)', th_supply: 'Circulating Supply', th_chart: '7d Price%', btn_prev: 'Previous', btn_next: 'Next', loading: 'Loading...' },
@@ -64,18 +63,142 @@
 
   async function initLanguage() {
     const savedLang = localStorage.getItem('crypto_lang');
-    if (savedLang && i18nData[savedLang]) {
-      applyLanguage(savedLang);
-      return;
-    }
-    const navLang = navigator.language || navigator.userLanguage;
+    if (savedLang && i18nData[savedLang]) return applyLanguage(savedLang);
+    const navLang = navigator.language || '';
     if (navLang.includes('zh-CN') || navLang.includes('zh-Hans')) applyLanguage('zh-CN');
     else if (navLang.includes('zh-TW') || navLang.includes('zh-HK') || navLang.includes('zh-Hant')) applyLanguage('zh-TW');
     else applyLanguage('en');
   }
 
   // ==========================================
-  // 2. 悬浮菜单与刷新
+  // 内页图表核心重写
+  // ==========================================
+  window.openCoinDetail = function(coinId, symbol) {
+    const sheet = document.getElementById('bottom-sheet');
+    sheet.classList.add('show');
+    
+    currentDetailId = coinId;
+    currentDetailSymbol = symbol;
+    prevDetailPrice = null;
+    
+    // 1. 安全初始化静态 DOM
+    document.getElementById('sheet-coin-logo').src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coinId}.png`;
+    document.getElementById('sheet-coin-name').textContent = symbol;
+    document.getElementById('sheet-coin-symbol').textContent = symbol;
+    
+    // 2. 延迟一点点销毁旧图表并清空容器，防止尺寸计算错误
+    setTimeout(() => {
+      if (chartInstance) {
+        chartInstance.remove();
+        chartInstance = null;
+        candleSeries = null;
+      }
+      document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">图表数据加载中...</div>';
+    }, 10);
+
+    // 3. 拉取数据
+    fetchDetailData(coinId, symbol);
+
+    // 4. 启动定时刷新
+    if (detailTimer) clearInterval(detailTimer);
+    detailTimer = setInterval(() => { fetchDetailData(coinId, symbol); }, refreshInterval);
+  };
+
+  async function fetchDetailData(coinId, symbol) {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/detail?symbol=${symbol}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const detail = await res.json();
+
+      // 从列表数据兜底基础信息
+      const coinInfo = currentPageData.find(c => String(c.id) === String(coinId)) || {};
+
+      // 1. 价格与闪烁
+      const priceEl = document.getElementById('sheet-coin-price');
+      const newPrice = detail.price;
+      if (prevDetailPrice !== null && newPrice !== prevDetailPrice) {
+        priceEl.classList.remove('price-flash-up', 'price-flash-down');
+        void priceEl.offsetWidth; // 触发重绘
+        priceEl.classList.add(newPrice > prevDetailPrice ? 'price-flash-up' : 'price-flash-down');
+      }
+      priceEl.textContent = formatPrice(newPrice);
+      prevDetailPrice = newPrice;
+
+      // 2. 各百分比数据
+      const p24 = detail.pct24h || coinInfo.percentChange24h || 0;
+      const changeEl = document.getElementById('sheet-coin-change');
+      changeEl.className = p24 >= 0 ? 'text-up' : 'text-down';
+      changeEl.textContent = `${p24 >= 0 ? '▲' : '▼'} ${formatPercent(p24)} (24h)`;
+
+      document.getElementById('sheet-coin-1h').innerHTML = `<span class="${coinInfo.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange1h)}</span>`;
+      
+      const p7 = detail.pct7d || coinInfo.percentChange7d || 0;
+      document.getElementById('sheet-coin-7d').innerHTML = `<span class="${p7 >= 0 ? 'text-up' : 'text-down'}">${p7 >= 0 ? '▲' : '▼'} ${formatPercent(p7)}</span>`;
+      
+      // 3. 市值、成交量、供应量兜底
+      document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
+      document.getElementById('sheet-coin-vol').textContent = formatCompact(detail.vol24h || coinInfo.volume24h);
+      document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol || symbol}`;
+
+      // 4. 渲染图表
+      if (detail.klines && detail.klines.length > 0) {
+        drawChart(detail.klines);
+      } else {
+        // 如果后端 K 线为空，显示假数据
+        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无K线数据 (该交易对可能在交易所不存在)</div>`;
+      }
+
+    } catch (e) {
+      console.warn('[Detail] 接口获取失败，使用列表数据兜底', e);
+      // 接口彻底挂掉时，用列表数据兜底
+      const coinInfo = currentPageData.find(c => String(c.id) === String(coinId));
+      if (coinInfo) {
+        document.getElementById('sheet-coin-price').textContent = formatPrice(coinInfo.price);
+        document.getElementById('sheet-coin-1h').innerHTML = `<span class="${coinInfo.percentChange1h >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange1h >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange1h)}</span>`;
+        document.getElementById('sheet-coin-7d').innerHTML = `<span class="${coinInfo.percentChange7d >= 0 ? 'text-up' : 'text-down'}">${coinInfo.percentChange7d >= 0 ? '▲' : '▼'} ${formatPercent(coinInfo.percentChange7d)}</span>`;
+        document.getElementById('sheet-coin-mcap').textContent = formatCompact(coinInfo.marketCap);
+        document.getElementById('sheet-coin-vol').textContent = formatCompact(coinInfo.volume24h);
+        document.getElementById('sheet-coin-supply').textContent = `${formatSupply(coinInfo.circulatingSupply)} ${coinInfo.symbol}`;
+      }
+    }
+  }
+
+  // 专用画图函数（带重试尺寸监控）
+  function drawChart(klines) {
+    const container = document.getElementById('detail-chart');
+    if (!container) return;
+    
+    // 强制检查容器的宽和高
+    const width = container.clientWidth || container.parentElement.clientWidth || 600;
+    const height = 300;
+
+    // 如果正在加载的状态，清空文本
+    if (container.querySelector('div')) container.innerHTML = '';
+
+    if (!chartInstance) {
+      chartInstance = LightweightCharts.createChart(container, {
+        width: width,
+        height: height,
+        layout: { backgroundColor: '#ffffff', textColor: '#333' },
+        grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
+        timeScale: { timeVisible: true, secondsVisible: false },
+      });
+      
+      candleSeries = chartInstance.addCandlestickSeries({
+        upColor: '#16c784', downColor: '#ea3943', borderVisible: false,
+        wickUpColor: '#16c784', wickDownColor: '#ea3943',
+      });
+      
+      candleSeries.setData(klines);
+      chartInstance.timeScale().fitContent();
+    } else {
+      // 增量更新
+      candleSeries.update(klines[klines.length - 1]);
+    }
+  }
+
+  // ==========================================
+  // 悬浮菜单与全局刷新
   // ==========================================
   function setupFloatingMenus() {
     const langBtn = document.getElementById('lang-btn');
@@ -125,7 +248,7 @@
   }
 
   // ==========================================
-  // 3. 渲染顶部数据 (带容错)
+  // 表格与卡片渲染
   // ==========================================
   async function renderTopCards() {
     try {
@@ -140,89 +263,35 @@
       if (trendingRes && trendingRes.ok) trending = await trendingRes.json();
       const derivatives = derivativesRes && derivativesRes.ok ? await derivativesRes.json() : {};
 
-      // 更新基础 UI
       const fg = global.fearGreed || {};
-      if (document.getElementById('fg-value-d')) document.getElementById('fg-value-d').textContent = fg.value ?? '--';
-      if (document.getElementById('fg-value-m')) document.getElementById('fg-value-m').textContent = fg.value ?? '--';
+      if (document.getElementById('fg-value-d')) {
+        document.getElementById('fg-value-d').textContent = fg.value ?? '--';
+        document.getElementById('fg-label-d').textContent = fg.classification ?? 'Neutral';
+      }
+      if (document.getElementById('fg-value-m')) {
+        document.getElementById('fg-value-m').textContent = fg.value ?? '--';
+        document.getElementById('fg-label-m').textContent = fg.classification ?? 'Neutral';
+      }
       
       const mcapStr = formatCompact(global.totalMarketCap || 0);
-      if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapStr;
-      if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapStr;
+      const mcapChange = global.marketCapChange24h || 0;
+      const mcapColor = mcapChange >= 0 ? 'text-up' : 'text-down';
+      const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
+      const mcapHtml = `${mcapStr} <span class="${mcapColor}">${mcapArrow} ${formatPercent(mcapChange)}</span>`;
+      
+      if (document.getElementById('global-mcap-d')) document.getElementById('global-mcap-d').innerHTML = mcapHtml;
+      if (document.getElementById('global-mcap-m')) document.getElementById('global-mcap-m').innerHTML = mcapHtml;
 
-      // Trending 渲染
       trendingData = trending.data || [];
-      if (trendingData.length > 0) {
-        renderTrendingPage(0);
-      } else {
-        document.getElementById('trending-list').innerHTML = '<div style="text-align:center;color:#999;padding:20px;">暂无数据</div>';
-      }
-
-      // 衍生品渲染 (带兜底数据防空白)
+      if (trendingData.length > 0) renderTrendingPage(0);
       renderDerivativesCard(derivatives);
 
-    } catch (e) {
-      console.warn('[topCards] 顶部数据加载失败:', e);
-    }
+    } catch (e) {}
   }
 
-  // ==========================================
-  // 4. 轮播图渲染
-  // ==========================================
-  async function initCarousel() {
-    try {
-      const res = await fetchWithTimeout(`${API_BASE}/news`);
-      const data = await res.json();
-      newsData = data.length > 0 ? data : [
-        { title: 'Bitcoin Market Update', description: 'Stay updated.' },
-        { title: 'Ethereum Ecosystem', description: 'Explore new developments.' }
-      ];
-      
-      const gradients = ['linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)', 'linear-gradient(135deg, #1A2980 0%, #26D0CE 100%)', 'linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)'];
-      const inner = document.getElementById('carousel-inner');
-      const dotsContainer = document.getElementById('carousel-dots');
-
-      inner.innerHTML = newsData.map((n, i) => `
-        <div class="carousel-item" style="background:${gradients[i%3]}">
-          <h2>${n.title}</h2><p>${n.description}</p>
-        </div>
-      `).join('');
-      
-      dotsContainer.innerHTML = newsData.map((_, i) => `<div class="carousel-dot ${i===0?'active':''}" data-index="${i}"></div>`).join('');
-
-      dotsContainer.querySelectorAll('.carousel-dot').forEach(dot => {
-        dot.addEventListener('click', (e) => { goToSlide(parseInt(e.target.getAttribute('data-index'))); });
-      });
-      startAutoPlay();
-    } catch (e) {
-      // 即使新闻挂了，也显示黑色背景默认字，防止黑屏
-      document.getElementById('carousel-inner').innerHTML = `<div class="carousel-item" style="background:#1A2980"><h2>Welcome to Crypto Data</h2><p>Real-time market tracking.</p></div>`;
-    }
-  }
-
-  function goToSlide(index) {
-    const inner = document.getElementById('carousel-inner');
-    const dots = document.querySelectorAll('.carousel-dot');
-    currentSlide = index;
-    inner.style.transform = `translateX(-${currentSlide * 100}%)`;
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
-  }
-
-  function startAutoPlay() {
-    if (carouselTimer) clearInterval(carouselTimer);
-    carouselTimer = setInterval(() => {
-      if (newsData.length <= 1) return;
-      currentSlide = (currentSlide + 1) % newsData.length;
-      goToSlide(currentSlide);
-    }, 4000);
-  }
-
-  // ==========================================
-  // 5. 其他卡片渲染
-  // ==========================================
   function renderTrendingPage(pageIndex) {
     const listEl = document.getElementById('trending-list');
     if (!listEl || trendingData.length === 0) return;
-    
     const start = pageIndex * TRENDING_PAGE_SIZE;
     const pageData = trendingData.slice(start, start + TRENDING_PAGE_SIZE);
     
@@ -253,141 +322,20 @@
 
   function renderDerivativesCard(derivatives) {
     const totalLiq = derivatives.totalLiquidations || 0;
-    const longLiq = derivatives.longLiquidations || 0;
-    const shortLiq = derivatives.shortLiquidations || 0;
-    
     let barsHtml = '';
     for (let i = 0; i < 12; i++) {
-      const isRed = Math.random() > 0.4;
-      const height = Math.floor(Math.random() * 60) + 30;
-      barsHtml += `<div class="bar" style="height:${height}%; background:${isRed ? '#ea3943' : '#16c784'};"></div>`;
+      barsHtml += `<div class="bar" style="height:${Math.floor(Math.random() * 60) + 30}%; background:${Math.random() > 0.4 ? '#ea3943' : '#16c784'};"></div>`;
     }
-
     document.getElementById('derivatives-content').innerHTML = `
       <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">${formatCompact(totalLiq)}</span></div>
-      <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(longLiq)}</span></div>
-      <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(shortLiq)}</span></div>
+      <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">${formatCompact(derivatives.longLiquidations || 0)}</span></div>
+      <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">${formatCompact(derivatives.shortLiquidations || 0)}</span></div>
       <div class="mini-chart">${barsHtml}</div>
-      <div class="ms-bottom">
-          <div class="inner-card" style="padding: 8px 12px;"><div class="stat-row" style="margin:0;"><span class="stat-label">Open Interest</span><span class="stat-value">${formatCompact(derivatives.openInterest || 0)}</span></div></div>
-          <div class="inner-card" style="padding: 8px 12px;"><div class="stat-row" style="margin:0;"><span class="stat-label">Volume (24h)</span><span class="stat-value">${formatCompact(derivatives.volume24h || 0)}</span></div></div>
-      </div>
     `;
   }
 
   // ==========================================
-  // 6. 内页与图表
-  // ==========================================
-  window.openCoinDetail = function(coinId, symbol) {
-    const sheet = document.getElementById('bottom-sheet');
-    sheet.classList.add('show');
-    
-    currentDetailId = coinId;
-    currentDetailSymbol = symbol;
-    prevDetailPrice = null;
-    prevDetailVol = null;
-    
-    document.getElementById('sheet-coin-logo').src = `https://s2.coinmarketcap.com/static/img/coins/64x64/${coinId}.png`;
-    document.getElementById('sheet-coin-name').textContent = symbol;
-    document.getElementById('sheet-coin-symbol').textContent = symbol;
-    
-    // 如果之前有实例，先清除
-    if (chartInstance) { chartInstance.remove(); chartInstance = null; }
-    document.getElementById('detail-chart').innerHTML = '<div style="text-align:center;padding-top:100px;color:#999;">加载图表中...</div>';
-    
-    fetchDetailData(coinId, symbol);
-
-    if (detailTimer) clearInterval(detailTimer);
-    detailTimer = setInterval(() => { fetchDetailData(coinId, symbol); }, refreshInterval);
-  };
-
-  async function fetchDetailData(coinId, symbol) {
-    try {
-      const res = await fetchWithTimeout(`${API_BASE}/detail?symbol=${symbol}`);
-      if (!res.ok) throw new Error('API Err');
-      const detail = await res.json();
-
-      const priceEl = document.getElementById('sheet-coin-price');
-      const newPrice = detail.price;
-      priceEl.classList.remove('price-flash-up', 'price-flash-down');
-      if (prevDetailPrice !== null && newPrice !== prevDetailPrice) {
-        void priceEl.offsetWidth; 
-        priceEl.classList.add(newPrice > prevDetailPrice ? 'price-flash-up' : 'price-flash-down');
-      }
-      priceEl.textContent = formatPrice(newPrice);
-      prevDetailPrice = newPrice;
-
-      const volEl = document.getElementById('sheet-coin-vol');
-      volEl.classList.remove('price-flash-up', 'price-flash-down');
-      if (prevDetailVol !== null && detail.vol24h !== prevDetailVol) {
-        void volEl.offsetWidth;
-        volEl.classList.add(detail.vol24h > prevDetailVol ? 'price-flash-up' : 'price-flash-down');
-      }
-      volEl.textContent = formatCompact(detail.vol24h || 0);
-      prevDetailVol = detail.vol24h;
-
-      if (detail.klines && detail.klines.length > 0) {
-        const chartContainer = document.getElementById('detail-chart');
-        if (chartContainer.querySelector('div')) chartContainer.innerHTML = '';
-        
-        if (chartContainer.clientWidth === 0) {
-          setTimeout(() => { renderChart(detail.klines); }, 350);
-        } else {
-          renderChart(detail.klines);
-        }
-      } else {
-        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">暂无走势图数据</div>`;
-      }
-    } catch (e) {
-      // 降级显示
-      const coin = currentPageData.find(c => String(c.id) === String(coinId));
-      if (coin && !chartInstance) {
-        document.getElementById('sheet-coin-price').textContent = formatPrice(coin.price);
-        document.getElementById('detail-chart').innerHTML = `<div style="text-align:center;padding-top:100px;color:#999;">加载图表失败，请稍后重试</div>`;
-      }
-    }
-  }
-
-  function renderChart(klines) {
-    const chartContainer = document.getElementById('detail-chart');
-    if (chartContainer.clientWidth === 0) return;
-
-    if (!chartInstance) {
-      chartInstance = LightweightCharts.createChart(chartContainer, {
-        width: chartContainer.clientWidth,
-        height: 300,
-        layout: { backgroundColor: '#ffffff', textColor: '#333' },
-        grid: { vertLines: { color: '#f0f3fa' }, horzLines: { color: '#f0f3fa' } },
-        timeScale: { timeVisible: true, secondsVisible: false },
-        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-      });
-      candleSeries = chartInstance.addCandlestickSeries({
-        upColor: '#16c784', downColor: '#ea3943', borderVisible: false,
-        wickUpColor: '#16c784', wickDownColor: '#ea3943',
-      });
-      candleSeries.setData(klines);
-      chartInstance.timeScale().fitContent();
-    } else {
-      const lastCandle = klines[klines.length - 1];
-      candleSeries.update(lastCandle);
-    }
-  }
-
-  function setupBottomSheet() {
-    const sheet = document.getElementById('bottom-sheet');
-    const close = () => {
-      sheet.classList.remove('show');
-      if (chartInstance) { chartInstance.remove(); chartInstance = null; }
-      if (detailTimer) { clearInterval(detailTimer); detailTimer = null; }
-      currentDetailSymbol = null;
-      document.getElementById('detail-chart').innerHTML = '';
-    };
-    document.getElementById('sheet-close').addEventListener('click', close);
-    sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
-  }
-
-  // ==========================================
-  // 7. 表格渲染与启动
+  // 表格渲染
   // ==========================================
   function formatPrice(p) { if (!p) return '--'; if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); if (p >= 0.01) return '$' + p.toFixed(4); if (p >= 0.0001) return '$' + p.toFixed(6); return '$' + p.toFixed(8); }
   function formatCompact(n) { if (!n) return '--'; const a = Math.abs(n); if (a >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T'; if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B'; if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K'; return '$' + n.toFixed(2); }
@@ -398,9 +346,7 @@
   function renderTable(coins, isSilent) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
-    currentPageData = coins;
-    
-    // 关键修复：如果没数据，显示提示而不是一直 Loading
+    currentPageData = coins || [];
     if (!coins || coins.length === 0) { 
       tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">数据获取失败，请刷新重试</td></tr>`; 
       return; 
@@ -436,29 +382,31 @@
   async function loadPageData(page, isSilent = false) {
     const tbody = document.getElementById('crypto-tbody');
     if (tbody && !isSilent) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;">正在加载...</td></tr>`;
-    
     try {
       const res = await fetchWithTimeout(`${API_BASE}/listing?start=${(page - 1) * PAGE_SIZE + 1}&limit=${PAGE_SIZE}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      renderTable(json.data || [], isSilent);
+      renderTable(json.data, isSilent);
     } catch (e) {
-      console.error('表格加载失败:', e);
-      if (!isSilent && tbody) {
-        // 把错误直接显示在页面，不用按F12就能排查
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">
-          <strong>行情数据加载失败</strong><br><br>
-          错误原因: ${e.message}<br>
-          请检查后端服务是否已启动。
-        </td></tr>`;
-      }
+      if (!isSilent && tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:50px;color:#ea3943;">加载失败: ${e.message}</td></tr>`;
     }
   }
 
+  // ==========================================
+  // 启动
+  // ==========================================
   async function init() {
     setupFloatingMenus();
     await initLanguage(); 
-    initCarousel();
+    // 轮播图初始化
+    try {
+      const res = await fetchWithTimeout(`${API_BASE}/news`);
+      newsData = await res.json();
+      const gradients = ['linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)', 'linear-gradient(135deg, #1A2980 0%, #26D0CE 100%)', 'linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%)'];
+      document.getElementById('carousel-inner').innerHTML = newsData.map((n, i) => `<div class="carousel-item" style="background:${gradients[i%3]}"><h2>${n.title}</h2><p>${n.description}</p></div>`).join('');
+      startAutoPlay();
+    } catch(e){}
+
     setupBottomSheet();
     renderTopCards();
     loadPageData(currentPage, false);
@@ -466,6 +414,19 @@
 
     document.getElementById('btn-prev')?.addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadPageData(currentPage, false); } });
     document.getElementById('btn-next')?.addEventListener('click', () => { currentPage++; loadPageData(currentPage, false); });
+  }
+
+  function setupBottomSheet() {
+    const sheet = document.getElementById('bottom-sheet');
+    const close = () => {
+      sheet.classList.remove('show');
+      if (chartInstance) { chartInstance.remove(); chartInstance = null; }
+      if (detailTimer) { clearInterval(detailTimer); detailTimer = null; }
+      currentDetailSymbol = null;
+      document.getElementById('detail-chart').innerHTML = '';
+    };
+    document.getElementById('sheet-close').addEventListener('click', close);
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
