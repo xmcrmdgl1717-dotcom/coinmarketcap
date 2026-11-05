@@ -16,9 +16,9 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafd; color: var(--text-primary); font-size: 14px; -webkit-font-smoothing: antialiased; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* 闪烁动画 */
-        @keyframes flash-up { 0% { color: var(--up-color); } 100% { color: inherit; } }
-        @keyframes flash-down { 0% { color: var(--down-color); } 100% { color: inherit; } }
+        /* 闪烁动画 (背景闪烁，与首页一致) */
+        @keyframes flash-up { 0% { background-color: rgba(22, 199, 132, 0.2); } 100% { background-color: transparent; } }
+        @keyframes flash-down { 0% { background-color: rgba(234, 57, 67, 0.2); } 100% { background-color: transparent; } }
         .price-flash-up { animation: flash-up 1s ease-out; }
         .price-flash-down { animation: flash-down 1s ease-out; }
 
@@ -32,7 +32,7 @@
         .dropdown-menu div:hover { background: var(--bg-hover); }
         .dropdown-menu div.active { color: var(--up-color); font-weight: 600; background: #f0fdf9; }
 
-        /* 轮播图 (修复宽度挤压问题) */
+        /* 轮播图 */
         .banner-carousel { position: relative; width: 100%; aspect-ratio: 3/1; border-radius: 16px; overflow: hidden; margin-bottom: 24px; box-shadow: var(--shadow); background: #000; }
         .carousel-inner { display: flex; transition: transform 0.5s ease-in-out; height: 100%; width: 100%; }
         .carousel-item { flex-shrink: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center; padding: 20px; box-sizing: border-box; }
@@ -99,14 +99,15 @@
         .sheet-header h2 { margin: 0; font-size: 20px; }
         .sheet-header p { margin: 2px 0 0 0; color: var(--text-secondary); font-size: 14px; }
         .sheet-price { display: flex; align-items: baseline; gap: 12px; margin-bottom: 24px; }
-        .sheet-price h1 { margin: 0; font-size: 32px; font-weight: 700; transition: color 0.3s; }
+        .sheet-price h1 { margin: 0; font-size: 32px; font-weight: 700; padding: 0 4px; border-radius: 4px;}
         .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
         .sheet-grid-item { background: var(--bg-inner); padding: 12px; border-radius: 8px; }
         .sheet-grid-item label { display: block; color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
-        .sheet-grid-item span { font-weight: 600; font-size: 15px; }
+        .sheet-grid-item span { font-weight: 600; font-size: 15px; padding: 0 4px; border-radius: 4px; display: inline-block;}
         
+        /* 图表高度固定，防止初始化时塌陷 */
         .sheet-chart-container { background: #fff; border: 1px solid var(--border-color); padding: 12px; border-radius: 12px; margin-top: 10px; }
-        #detail-chart { width: 100%; height: 250px; }
+        #detail-chart { width: 100%; height: 300px; } 
 
         /* 移动端 */
         .mobile-only { display: none; }
@@ -275,7 +276,7 @@
                 <div class="sheet-grid-item"><label data-i18n="th_1h">1h %</label><span id="sheet-coin-1h">--</span></div>
                 <div class="sheet-grid-item"><label data-i18n="th_7d">7d %</label><span id="sheet-coin-7d">--</span></div>
                 <div class="sheet-grid-item"><label data-i18n="th_mcap">Market Cap</label><span id="sheet-coin-mcap">--</span></div>
-                <div class="sheet-grid-item"><label data-i18n="th_vol">Volume (24h)</label><span id="sheet-coin-vol" style="transition: color 0.3s;">--</span></div>
+                <div class="sheet-grid-item"><label data-i18n="th_vol">Volume (24h)</label><span id="sheet-coin-vol">--</span></div>
                 <div class="sheet-grid-item" style="grid-column: span 2;"><label data-i18n="th_supply">Circulating Supply</label><span id="sheet-coin-supply">--</span></div>
             </div>
             
