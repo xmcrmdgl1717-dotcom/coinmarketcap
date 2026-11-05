@@ -7,7 +7,9 @@ const coinlore = require('../providers/coinlore');
 
 const router = express.Router();
 
-// 1. 新增：全量拉取接口
+// ==========================================
+// 获取全量币种数据 (用于前端一次性拉取)
+// ==========================================
 router.get('/all', async (req, res) => {
   const key = 'listing:all';
   const cached = cache.get(key);
@@ -21,7 +23,7 @@ router.get('/all', async (req, res) => {
         const limit = 5000; // CMC 单次请求最大限制
         let totalCount = Infinity;
 
-        // 循环拉取直到获取全部数据
+        // 循环拉取直到没有更多数据
         while (start <= totalCount) {
           const r = await cmc.fetchListing({ start, limit });
           allData.push(...r.data);
@@ -31,7 +33,7 @@ router.get('/all', async (req, res) => {
         }
         
         const finalRes = { data: allData, totalCount: allData.length, source: 'cmc' };
-        cache.set(key, finalRes, 5 * 60 * 1000); // 全量数据缓存 5 分钟
+        cache.set(key, finalRes, 5 * 60 * 1000); // 缓存 5 分钟
         return finalRes;
       } catch (err) {
         console.warn('[listing/all] CMC failed, fallback CoinLore:', err.message);
@@ -47,7 +49,9 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// 2. 原有分页接口保留（用于部分局部刷新）
+// ==========================================
+// 原有分页接口 (保持兼容)
+// ==========================================
 router.get('/', async (req, res) => {
   const start = Math.max(1, parseInt(req.query.start, 10) || 1);
   const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit, 10) || 100));
