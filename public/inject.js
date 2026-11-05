@@ -5,16 +5,16 @@
   let currentPage = 1;
   const PAGE_SIZE = 100;
 
-  // --- 补全了之前的缺失函数 ---
+  // --- 格式化函数 ---
   function formatPrice(p) {
-    if (p == null || isNaN(p)) return '--';
+    if (p == null || isNaN(p) || p === 0) return '--';
     if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     if (p >= 0.01) return '$' + p.toFixed(4);
     if (p >= 0.0001) return '$' + p.toFixed(6);
     return '$' + p.toFixed(8);
   }
   function formatCompact(n) {
-    if (n == null || isNaN(n)) return '--';
+    if (n == null || isNaN(n) || n === 0) return '--';
     const a = Math.abs(n);
     if (a >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
     if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
@@ -22,9 +22,8 @@
     if (a >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K';
     return '$' + n.toFixed(2);
   }
-  // 👇 核心修复：补充流通量格式化
   function formatSupply(n) {
-    if (n == null || isNaN(n)) return '--';
+    if (n == null || isNaN(n) || n === 0) return '--';
     const a = Math.abs(n);
     if (a >= 1e12) return (n / 1e12).toFixed(2) + 'T';
     if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B';
@@ -37,7 +36,7 @@
     return Math.abs(p).toFixed(2) + '%';
   }
 
-  // 渲染顶部卡片
+  // --- 渲染顶部卡片 ---
   async function renderTopCards() {
     try {
       const [globalRes, trendingRes, derivativesRes] = await Promise.all([
@@ -89,7 +88,7 @@
     }
   }
 
-  // 渲染表格
+  // --- 渲染表格 ---
   function renderTable(coins) {
     const tbody = document.getElementById('crypto-tbody');
     if (!tbody) return;
@@ -98,7 +97,7 @@
     const btnNext = document.getElementById('btn-next');
 
     if (!coins || coins.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px;">当前页没有数据。</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:50px;">当前页没有数据或接口请求失败。</td></tr>';
       return;
     }
 
