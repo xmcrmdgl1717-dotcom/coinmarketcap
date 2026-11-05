@@ -25,7 +25,7 @@
         }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-        /* ================= 桌面端顶部卡片 (保持原样) ================= */
+        /* ================= 桌面端顶部卡片 ================= */
         .top-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
         .card { background: var(--bg-card); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
         .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
@@ -59,7 +59,7 @@
         .mini-chart { height: 40px; background: var(--bg-inner); margin-bottom: 12px; border-radius: 8px; position: relative; display: flex; align-items: flex-end; padding: 0 10px; gap: 4px; overflow: hidden;}
         .bar { flex: 1; border-radius: 2px 2px 0 0; }
 
-        /* ================= 表格 ================= */
+        /* ================= 表格通用样式 ================= */
         .table-wrapper { background: var(--bg-card); border-radius: 12px; box-shadow: var(--shadow); border: 1px solid var(--border-color); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; text-align: right; }
         th { color: var(--text-secondary); font-weight: 500; font-size: 12px; padding: 16px 12px; border-bottom: 1px solid var(--border-color); white-space: nowrap; background: #fff; }
@@ -96,7 +96,7 @@
         .sheet-chart { background: var(--bg-inner); padding: 16px; border-radius: 12px; text-align: center; }
         .sheet-chart img { width: 100%; max-width: 300px; height: auto; }
 
-        /* ================= 移动端 UI ================= */
+        /* ================= 移动端响应式 (方案二：2x2 紧凑网格) ================= */
         .mobile-only { display: none; }
         
         @media (max-width: 768px) {
@@ -104,59 +104,60 @@
             .desktop-only { display: none !important; }
             .mobile-only { display: block; }
 
-            /* 极简聚合卡片 */
-            .mobile-card {
-                background: var(--bg-card); border-radius: 12px; padding: 16px;
-                box-shadow: var(--shadow); border: 1px solid var(--border-color);
+            /* 2x2 紧凑网格 */
+            .mobile-top-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
                 margin-bottom: 16px;
-                display: flex; flex-direction: column;
             }
-            .mobile-card-top { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
+            .m-card {
+                background: var(--bg-card); border-radius: 12px; padding: 12px;
+                box-shadow: var(--shadow); border: 1px solid var(--border-color);
+                display: flex; flex-direction: column; justify-content: center;
+                min-height: 110px;
+            }
+            .m-card-title { font-size: 11px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;}
+            .m-value { font-size: 15px; font-weight: 700; margin-bottom: 4px;}
             
-            /* 仪表盘缩小版 */
-            .mobile-gauge-wrap { flex: 0 0 100px; display: flex; flex-direction: column; align-items: center; }
-            .mobile-gauge { width: 90px; height: 45px; border-top-left-radius: 90px; border-top-right-radius: 90px; background: conic-gradient(from 270deg at 50% 100%, #ea3943 0%, #f3d42f 40%, #16c784 80%, transparent 80%); position: relative; display: flex; justify-content: center; align-items: flex-end; }
-            .mobile-gauge::after { content: ''; position: absolute; width: 70px; height: 35px; background: var(--bg-card); bottom: 0; left: 10px; border-top-left-radius: 70px; border-top-right-radius: 70px; }
-            .mobile-gauge-val { position: relative; z-index: 1; font-weight: 700; font-size: 16px; margin-bottom: 2px; }
-            .mobile-gauge-lbl { font-size: 10px; background: #f0b90b; color: #fff; padding: 2px 8px; border-radius: 10px; margin-top: 4px; font-weight: 600; }
+            /* 仪表盘缩放 */
+            .mobile-gauge { width: 70px; height: 35px; border-top-left-radius: 70px; border-top-right-radius: 70px; background: conic-gradient(from 270deg at 50% 100%, #ea3943 0%, #f3d42f 40%, #16c784 80%, transparent 80%); position: relative; display: flex; justify-content: center; align-items: flex-end; align-self: center; margin-top: 8px; }
+            .mobile-gauge::after { content: ''; position: absolute; width: 54px; height: 27px; background: var(--bg-card); bottom: 0; left: 8px; border-top-left-radius: 54px; border-top-right-radius: 54px; }
+            .mobile-gauge-val { position: relative; z-index: 1; font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+            .mobile-gauge-lbl { font-size: 10px; background: #f0b90b; color: #fff; padding: 2px 6px; border-radius: 10px; margin-top: 4px; font-weight: 600; align-self: center; }
 
-            /* 右侧数据 */
-            .mobile-stats { flex: 1; display: flex; flex-direction: column; gap: 12px; }
-            .mobile-stat-box { background: var(--bg-inner); padding: 10px; border-radius: 8px; }
-            
-            /* 底部进度条 */
-            .mobile-card-bottom { display: flex; gap: 12px; }
-            .mobile-card-bottom .box { flex: 1; background: var(--bg-inner); padding: 10px; border-radius: 8px; }
-
-            /* 表格移动端适配 */
+            /* 表格完美适配，不再截断 */
             table { table-layout: fixed; width: 100%; }
-            /* 隐藏次要列 */
+            th, td { padding: 14px 4px; }
+            
+            /* 强制分配宽度：排名10% 名称45% 价格25% 涨跌20% */
+            th:nth-child(1), td:nth-child(1) { width: 10%; text-align: center; }
+            th:nth-child(2), td:nth-child(2) { width: 45%; text-align: left; }
+            th:nth-child(3), td:nth-child(3) { width: 25%; text-align: right; }
+            th:nth-child(5), td:nth-child(5) { width: 20%; text-align: right; padding-right: 8px; }
+            
+            /* 隐藏所有次要列 */
             th:nth-child(4), td:nth-child(4),
             th:nth-child(6), td:nth-child(6),
             th:nth-child(7), td:nth-child(7),
             th:nth-child(8), td:nth-child(8),
             th:nth-child(9), td:nth-child(9),
             th:nth-child(10), td:nth-child(10) { display: none; }
-            
-            /* 分配列宽，防止 Price 溢出 */
-            th:nth-child(1), td:nth-child(1) { width: 8%; padding: 16px 4px; }
-            th:nth-child(2), td:nth-child(2) { width: 45%; padding: 16px 4px; }
-            th:nth-child(3), td:nth-child(3) { width: 25%; padding: 16px 4px; text-align: right; }
-            th:nth-child(5), td:nth-child(5) { width: 22%; padding: 16px 4px; text-align: right; }
-            
-            .coin-info img { width: 28px; height: 28px; }
-            .coin-name { font-size: 15px; }
-            .coin-symbol { display: none; } /* 移动端名称太长，隐藏符号，保留整体整洁 */
+
+            .coin-info { gap: 6px; }
+            .coin-info img { width: 22px; height: 22px; }
+            .coin-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .coin-symbol { display: none; } /* 移动端隐藏符号，防溢出 */
 
             /* 翻页居中 */
-            .pagination { justify-content: center; gap: 20px; }
-            button { padding: 12px 20px; flex: 1; }
+            .pagination { justify-content: center; gap: 10px; padding-bottom: 20px;}
+            button { padding: 12px 0; flex: 1; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 桌面端顶部卡片 -->
+        <!-- 桌面端布局 -->
         <div class="top-cards desktop-only">
             <div class="card">
                 <div class="card-title">Market Status <span>查看全部 ></span></div>
@@ -202,36 +203,50 @@
             </div>
         </div>
 
-        <!-- 移动端极简聚合卡片 -->
-        <div class="mobile-only mobile-card">
-            <div class="mobile-card-top">
-                <div class="mobile-gauge-wrap">
-                    <div class="mobile-gauge"></div>
-                    <div class="mobile-gauge-val" id="fg-value-m">--</div>
-                    <div class="mobile-gauge-lbl" id="fg-label-m">Neutral</div>
+        <!-- 移动端布局：2x2 网格 -->
+        <div class="mobile-only mobile-top-grid">
+            <!-- Card 1: 恐慌贪婪 -->
+            <div class="m-card">
+                <div class="m-card-title">Fear & Greed</div>
+                <div class="mobile-gauge"></div>
+                <div class="mobile-gauge-val" id="fg-value-m">--</div>
+                <div class="mobile-gauge-lbl" id="fg-label-m">Neutral</div>
+            </div>
+            
+            <!-- Card 2: 市值与 CMC20 -->
+            <div class="m-card" style="justify-content: space-around;">
+                <div>
+                    <div class="m-card-title">Market Cap</div>
+                    <div class="m-value" id="global-mcap-m">--</div>
                 </div>
-                <div class="mobile-stats">
-                    <div class="mobile-stat-box">
-                        <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value" id="global-mcap-m">--</span></div>
-                    </div>
-                    <div class="mobile-stat-box">
-                        <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
-                    </div>
+                <div>
+                    <div class="m-card-title">CMC20</div>
+                    <div class="m-value">$163.14 <span class="text-up" style="font-size:12px; font-weight:500;">▲ 1.77%</span></div>
                 </div>
             </div>
-            <div class="mobile-card-bottom">
-                <div class="box">
-                    <div class="stat-row"><span class="stat-label">Altcoin Season</span><span class="stat-value">48</span></div>
-                    <div class="progress-bar">
+
+            <!-- Card 3: Altcoin & ETF -->
+            <div class="m-card" style="justify-content: space-around;">
+                <div>
+                    <div class="m-card-title">Altcoin Season</div>
+                    <div class="m-value">48</div>
+                    <div class="progress-bar" style="margin-top: 4px;">
                         <div class="progress-seg" style="width:25%; background:#f0b90b;"></div>
                         <div class="progress-seg" style="width:25%; background:#cfd6e4;"></div>
                         <div class="progress-seg" style="width:25%; background:#3b82f6;"></div>
                         <div class="progress-seg" style="width:25%; background:#16c784;"></div>
                     </div>
                 </div>
-                <div class="box">
-                    <div class="stat-row"><span class="stat-label">ETF Flows</span><span class="stat-value text-up">+ $148.10M</span></div>
+                <div style="margin-top: 8px;">
+                    <div class="m-card-title">ETF Flows</div>
+                    <div class="m-value text-up">+ $148.10M</div>
                 </div>
+            </div>
+
+            <!-- Card 4: Trending (动态渲染第一) -->
+            <div class="m-card" id="mobile-trending-box">
+                <div class="m-card-title">Trending Coin</div>
+                <!-- JS 动态生成 -->
             </div>
         </div>
 
