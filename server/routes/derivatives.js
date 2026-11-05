@@ -1,9 +1,7 @@
 const express = require('express');
 const cache = require('../utils/cache');
 const { dedupe } = require('../utils/inflight');
-const config = require('../config');
 const cmc = require('../providers/cmc');
-
 const router = express.Router();
 
 router.get('/', async (req, res) => {
@@ -19,9 +17,7 @@ router.get('/', async (req, res) => {
     });
     return res.json({ ...result, cached: false });
   } catch (err) {
-    console.error('[derivatives] failed:', err.message);
-    return res.status(502).json({ error: 'derivatives unavailable' });
+    res.status(502).json({ error: 'derivatives unavailable' });
   }
 });
-
 module.exports = router;
