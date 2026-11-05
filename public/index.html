@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Markets</title>
+    <title>Cryptocurrency Prices by Market Cap</title>
     <style>
-        /* 基础变量与样式，完美复刻原版的高级感 */
+        /* 完美复刻 CMC 的视觉风格 */
         :root {
             --text-primary: #0d1421;
             --text-secondary: #616e85;
@@ -13,13 +13,15 @@
             --border-color: #eff2f5;
             --up-color: #16c784;
             --down-color: #ea3943;
+            --bg-card: #ffffff;
+            --shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
+            background-color: #f8fafd;
             color: var(--text-primary);
-            background: #fff;
             font-size: 14px;
         }
         .container {
@@ -27,7 +29,61 @@
             margin: 0 auto;
             padding: 20px;
         }
+
+        /* ================= 顶部卡片区域 ================= */
+        .top-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-title span {
+            color: var(--text-secondary);
+            font-weight: 400;
+            font-size: 12px;
+        }
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .stat-label {
+            color: var(--text-secondary);
+        }
+        .stat-value {
+            font-weight: 600;
+        }
+        .text-up { color: var(--up-color); }
+        .text-down { color: var(--down-color); }
+
+        /* ================= 表格区域 ================= */
         .table-wrapper {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
             overflow-x: auto;
         }
         table {
@@ -39,27 +95,26 @@
             color: var(--text-secondary);
             font-weight: 500;
             font-size: 12px;
-            padding: 12px 10px;
+            padding: 16px 12px;
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
+            background: #fff;
         }
-        /* 前两列靠左对齐 */
         th:nth-child(1), th:nth-child(2), td:nth-child(1), td:nth-child(2) {
             text-align: left;
         }
         td {
-            padding: 12px 10px;
+            padding: 16px 12px;
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
         }
         tbody tr:hover {
             background-color: var(--bg-hover);
         }
-        /* 币种信息 */
         .coin-info {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             cursor: pointer;
         }
         .coin-info img {
@@ -67,46 +122,100 @@
             height: 24px;
             border-radius: 50%;
         }
+        .coin-name {
+            font-weight: 600;
+        }
         .coin-symbol {
             color: var(--text-secondary);
             font-size: 12px;
         }
-        /* 涨跌颜色 */
-        .up { color: var(--up-color); }
-        .down { color: var(--down-color); }
-        
         .sparkline {
             width: 100px;
             height: 30px;
             object-fit: contain;
         }
-        /* 翻页控件 */
+
+        /* ================= 翻页控件 ================= */
         .pagination {
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             margin-top: 20px;
             padding-bottom: 40px;
         }
         button {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border: 1px solid #cfd6e4;
             background: #fff;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 14px;
+            font-weight: 500;
             color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background: var(--bg-hover);
+            border-color: #a6b0c3;
         }
         button:disabled {
             color: #ccc;
             cursor: not-allowed;
             border-color: var(--border-color);
         }
+        #page-info {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 只有你要求的顶部 4 个卡片 -->
+        <div class="top-cards" id="top-cards">
+            <div class="card">
+                <div class="card-title">Market Status <span>查看全部 ></span></div>
+                <div class="card-content">
+                    <div class="stat-row"><span class="stat-label">Fear & Greed</span><span class="stat-value">42 (Neutral)</span></div>
+                    <div class="stat-row"><span class="stat-label">Market Cap</span><span class="stat-value">$2.68T <span class="text-up">▲ 2.32%</span></span></div>
+                    <div class="stat-row"><span class="stat-label">CMC20</span><span class="stat-value">$163.14 <span class="text-up">▲ 1.77%</span></span></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Trending Coins <span>1/5 ></span></div>
+                <div class="card-content" id="trending-coins">
+                    <!-- 动态填充 -->
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Derivatives <span>详情 ></span></div>
+                <div class="card-content">
+                    <div class="stat-row"><span class="stat-label">All Liquidations (24h)</span><span class="stat-value">$662.05M</span></div>
+                    <div class="stat-row"><span class="stat-label">Long</span><span class="stat-value text-up">$239.55M</span></div>
+                    <div class="stat-row"><span class="stat-label">Short</span><span class="stat-value text-down">$422.5M</span></div>
+                    <div class="stat-row" style="margin-top: 8px;"><span class="stat-label">Open Interest</span><span class="stat-value">$338.38B</span></div>
+                    <div class="stat-row"><span class="stat-label">Volume (24h)</span><span class="stat-value">$956.75B</span></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Community <span>进入 ></span></div>
+                <div class="card-content">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <img src="https://s3.coinmarketcap.com/static-gravity/image/f4513c9b490e4dfb9c5ac561f63b95f4.png" style="width: 24px; height: 24px; border-radius: 50%;" />
+                        <div><strong>@TheCrypto_B</strong> <span style="color: var(--text-secondary); font-size: 12px;">· 7h · Bullish</span></div>
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.4;">$BTC is back above $80,000 after a nervous election night in the US...</div>
+                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                        <img src="https://s3.coinmarketcap.com/static-gravity/image/a6230ab72e024389867ee9fad62166d6.jpg" style="width: 24px; height: 24px; border-radius: 50%;" />
+                        <div><strong>LedgerLogic</strong> <span style="color: var(--text-secondary); font-size: 12px;">· 7h · Bearish</span></div>
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.4; margin-top: 4px;">Trump family crypto coins sink up to 19% after Democrats win...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 只有你要求的纯净表格 -->
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -124,13 +233,14 @@
                     </tr>
                 </thead>
                 <tbody id="crypto-tbody">
-                    <tr><td colspan="10" style="text-align: center; padding: 50px;">Loading data...</td></tr>
+                    <tr><td colspan="10" style="text-align: center; padding: 50px; color: var(--text-secondary);">正在加载行情数据...</td></tr>
                 </tbody>
             </table>
         </div>
+
         <div class="pagination">
-            <span id="page-info" style="color: var(--text-secondary); margin-right: 10px;"></span>
-            <button id="btn-prev" disabled>Previous</button>
+            <span id="page-info">Page 3</span>
+            <button id="btn-prev">Previous</button>
             <button id="btn-next">Next</button>
         </div>
     </div>
