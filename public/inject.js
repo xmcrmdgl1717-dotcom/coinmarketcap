@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const API_BASE = '/api';
+  const API_BASE = 'https://coinmarketcapweb.onrender.com/api';
   const PAGE_START = 201;
   const PAGE_LIMIT = 100;
   const REFRESH_INTERVAL = 30000;
